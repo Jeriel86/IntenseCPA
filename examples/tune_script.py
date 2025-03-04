@@ -56,6 +56,8 @@ model_args = {
     'train_split': 'train',
     'valid_split': 'valid',
     'test_split': 'ood',
+    'use_intense': True,
+    'intense_reg_rate': tune.choice([0.01, 0.05, 0.1]),
 }
 
 # Training hyperparameters for tuning
@@ -91,7 +93,7 @@ plan_kwargs_keys = list(train_args.keys())
 # Trainer arguments
 trainer_actual_args = {
     'max_epochs': 2000,
-    'use_gpu': True,
+    'use_gpu': False,
     'early_stopping_patience': 10,
     'check_val_every_n_epoch': 5,
 }
@@ -131,7 +133,7 @@ model.setup_anndata(adata, **setup_anndata_kwargs)
 resources = {
     "cpu": 10,
    # "gpu": 1,
-    "memory": 32 * 1024 * 1024 * 1024  # 32 GiB
+    "memory": 100 * 1024 * 1024 * 1024  # 32 GiB
 }
 
 # Run hyperparameter tuning
@@ -159,5 +161,6 @@ experiment = run_autotune(
 
 # Save results
 result_grid = experiment.result_grid
+print(result_grid)
 with open(os.path.join(PROJECT_ROOT, 'result_grid.pkl'), 'wb') as f:
     pickle.dump(result_grid, f)

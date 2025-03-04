@@ -113,7 +113,8 @@ class InTense(nn.Module):
         dim_dict_single: dict[str, int],
         feature_dim_dict_triple: dict[str, int],
         track_running_stats: bool = True,
-        out_features: int = 1
+        out_features: int = 1,
+        intense_reg_rate: float = 0.01
     ):
         super().__init__()
 
@@ -167,11 +168,12 @@ class InTense(nn.Module):
             "z23": feature_dim_dict_triple["23"],
             "z123": feature_dim_dict_triple["123"],
         }
+        self.intense_reg_rate = intense_reg_rate
         self.mkl_fusion = MKLFusion(
             in_features=in_feats,
             out_features=out_features,
             bias=True,
-            reg_rate=0.05
+            reg_rate=intense_reg_rate
         )
 
     def forward(self, z_dict: dict[str, torch.Tensor]) -> torch.Tensor:
