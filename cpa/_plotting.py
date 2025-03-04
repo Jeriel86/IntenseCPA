@@ -1276,7 +1276,7 @@ def plot_r2_matrix(adata,
         plt.show()
 
 
-def plot_history(model: CPA):
+def plot_history(model: CPA, save_path: Optional[str] = None):
     df = model.epoch_history
     n_metrics = len(df.columns) - 2
     fig, ax = plt.subplots(1, n_metrics, sharex=True, sharey=False, figsize=(24, 2.))
@@ -1296,3 +1296,5 @@ def plot_history(model: CPA):
         if i == n_metrics - 1:
             handles, labels = ax[i].get_legend_handles_labels()
             fig.legend(handles, ['train', 'valid'], loc='right')
+        if save_path is not None:
+            plt.savefig(save_path, bbox_inches='tight', dpi=100)

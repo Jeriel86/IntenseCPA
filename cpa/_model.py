@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from tkinter import N
 from typing import Optional, Sequence, Union, List, Dict
 
 from rdkit import Chem

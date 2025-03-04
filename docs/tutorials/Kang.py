@@ -45,7 +45,7 @@ print("New directory:", os.getcwd())
 current_dir = os.getcwd()
 
 # Uncomment to set GPU visibility
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 
 # Set Scanpy figure parameters
 sc.settings.set_figure_params(dpi=100)
@@ -163,8 +163,9 @@ model.train(
     save_path=save_path
 )
 
+plot_path = os.path.join(current_dir, "figures", "history.png")
 # Plot training history
-cpa.pl.plot_history(model)
+cpa.pl.plot_history(model,plot_path)
 
 # --- Restore Best Model (Optional) ---
 # model = cpa.CPA.load(
@@ -187,7 +188,7 @@ sc.pl.umap(
     color=['condition', 'cell_type'],
     frameon=False,
     wspace=0.3,
-    save=save_path+'latent_basal.png'  # Saves the plot as a file
+    save='latent_basal.png'  # Saves the plot as a file
 )
 
 # Final latent space (after condition and cell_type embeddings)
@@ -198,7 +199,7 @@ sc.pl.umap(
     color=['condition', 'cell_type'],
     frameon=False,
     wspace=0.3,
-    save=save_path+'latent_after.png'  # Saves the plot as a file
+    save='latent_after.png'  # Saves the plot as a file
 )
 
 # --- Evaluation ---
