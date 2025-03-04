@@ -111,6 +111,7 @@ model_params = {
     "dropout_rate_decoder": 0.1,
     "variational": False,
     "seed": 6977,
+    "use_intense": True
 }
 
 trainer_params = {
