@@ -376,19 +376,21 @@ class CPATrainingPlan(TrainingPlan):
                     list(filter(lambda p: p.requires_grad, self.module.pert_network.pert_embedding.parameters())) + \
                     list(filter(lambda p: p.requires_grad, self.module.covars_embeddings.parameters()))
 
+        if self.module.recon_loss in ['zinb', 'nb']:
+            ae_params += [self.module.px_r]
+
         if self.module.use_intense:
             intense_params = list(filter(lambda p: p.requires_grad, self.module.intense_fusion.parameters()))
             ae_params = [
                 {"params": ae_params, "weight_decay": self.wd},  # normal AE stuff
                 {"params": intense_params, "weight_decay": 0.0},  # no WD for InTense
             ]
-        if self.module.recon_loss in ['zinb', 'nb']:
-            ae_params += [self.module.px_r]
-
-        optimizer_autoencoder = torch.optim.Adam(
-            ae_params,
-            lr=self.lr,
-            weight_decay=self.wd)
+            optimizer_autoencoder = torch.optim.Adam(ae_params,lr=self.lr)
+        else:
+            optimizer_autoencoder = torch.optim.Adam(
+                ae_params,
+                lr=self.lr,
+                weight_decay=self.wd)
 
         scheduler_autoencoder = StepLR(optimizer_autoencoder, step_size=self.step_size_lr, gamma=0.9)
 

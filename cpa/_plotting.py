@@ -1279,22 +1279,53 @@ def plot_r2_matrix(adata,
 def plot_history(model: CPA, save_path: Optional[str] = None):
     df = model.epoch_history
     n_metrics = len(df.columns) - 2
-    fig, ax = plt.subplots(1, n_metrics, sharex=True, sharey=False, figsize=(24, 2.))
+
+    # Calculate layout: put up to 3 plots per row, adjust rows accordingly
+    plots_per_row = 3
+    n_rows = (n_metrics + plots_per_row - 1) // plots_per_row  # Ceiling division
+    fig, ax = plt.subplots(n_rows,
+                           min(n_metrics, plots_per_row),
+                           sharex=True,
+                           sharey=False,
+                           figsize=(24, 2. * n_rows))  # Adjust height based on rows
+
+    # Convert ax to 2D array if multiple rows, or keep as 1D if single row
+    if n_rows == 1:
+        ax = ax.reshape(1, -1)
+    else:
+        ax = ax.reshape(n_rows, min(n_metrics, plots_per_row))
+
+    # Plot each metric
     for i, col in enumerate(df.columns):
         if col in ['epoch', 'mode']:
             continue
 
+        # Calculate row and column position
+        row = i // plots_per_row
+        col_idx = i % plots_per_row
+
         train_df = df[df['mode'] == 'train']
         valid_df = df[df['mode'] == 'valid']
 
-        ax[i].plot(train_df['epoch'].values, train_df[col].values, label='train')
+        ax[row, col_idx].plot(train_df['epoch'].values,
+                              train_df[col].values,
+                              label='train')
         if len(valid_df) > 0:
-            ax[i].plot(valid_df['epoch'].values, valid_df[col].values, label='valid')
+            ax[row, col_idx].plot(valid_df['epoch'].values,
+                                  valid_df[col].values,
+                                  label='valid')
 
-        ax[i].set_title(df.columns[i + 2], fontweight="bold")
+        ax[row, col_idx].set_title(df.columns[i + 2], fontweight="bold")
 
+        # Add legend to the last plot in the grid
         if i == n_metrics - 1:
-            handles, labels = ax[i].get_legend_handles_labels()
+            handles, labels = ax[row, col_idx].get_legend_handles_labels()
             fig.legend(handles, ['train', 'valid'], loc='right')
-        if save_path is not None:
-            plt.savefig(save_path, bbox_inches='tight', dpi=100)
+
+    # Remove empty subplots if any
+    if n_metrics % plots_per_row != 0:
+        for j in range(n_metrics % plots_per_row, plots_per_row):
+            fig.delaxes(ax[-1, j])
+
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches='tight', dpi=100)
