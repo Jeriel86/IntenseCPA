@@ -10,6 +10,7 @@ from torch.distributions import Normal
 from torch.distributions.kl import kl_divergence as kl
 from torchmetrics.functional import accuracy, pearson_corrcoef, r2_score
 
+from ._intense import InTense
 from ._metrics import knn_purity
 from ._utils import PerturbationNetwork, VanillaEncoder, CPA_REGISTRY_KEYS
 
@@ -87,6 +88,7 @@ class CPAModule(BaseModuleClass):
                  dropout_rate_decoder: float = 0.0,
                  variational: bool = False,
                  seed: int = 0,
+                 use_intense: bool = False,
                  ):
         super().__init__()
 
@@ -105,6 +107,29 @@ class CPAModule(BaseModuleClass):
         self.variational = variational
 
         self.covars_encoder = covars_encoder
+        self.use_intense = use_intense
+
+        if self.use_intense:
+            dim_dict_single = {
+                "1": n_latent,
+                "2": n_latent,
+                "3": n_latent
+            }
+
+            feature_dim_dict_triple = {
+                "12": n_latent * n_latent,  # e.g. "basal⊗pert"
+                "13": n_latent * n_latent,  # e.g. "basal⊗covar"
+                "23": n_latent * n_latent,  # e.g. "pert⊗covar"
+                "123": n_latent * n_latent * n_latent  # e.g. "basal⊗pert⊗covar"
+            }
+
+            # Then build an InTense module:
+            self.intense_fusion = InTense(
+                dim_dict_single=dim_dict_single,
+                feature_dim_dict_triple=feature_dim_dict_triple,
+                track_running_stats=True,
+                out_features=n_latent  # final output dimension = n_latent
+            )
 
         if variational:
             self.encoder = Encoder(
@@ -304,8 +329,15 @@ class CPAModule(BaseModuleClass):
                 
                 if covar != batch_key:
                     z_covs_wo_batch += z_cov
-
-        z = z_basal + z_pert + z_covs
+        if self.use_intense:
+            z_dict_for_intense = {
+                "1": z_basal,  # shape [B, n_latent]
+                "2": z_pert,  # shape [B, n_latent]
+                "3": z_covs,  # shape [B, n_latent]
+            }
+            z = self.intense_fusion(z_dict_for_intense)
+        else:
+         z = z_basal + z_pert + z_covs
         z_corrected = z_basal + z_pert + z_covs_wo_batch
         z_no_pert = z_basal + z_covs
         z_no_pert_corrected = z_basal + z_covs_wo_batch
@@ -380,6 +412,9 @@ class CPAModule(BaseModuleClass):
         else:
             from scvi.model import SCVI
             kl_loss = torch.zeros_like(recon_loss)
+        if self.use_intense:
+            intense_reg = self.intense_fusion.get_regularizer()
+            return (recon_loss+intense_reg), kl_loss, intense_reg
 
         return recon_loss, kl_loss
 

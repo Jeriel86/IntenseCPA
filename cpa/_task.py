@@ -168,10 +168,18 @@ class CPATrainingPlan(TrainingPlan):
         self.do_clip_grad = do_clip_grad
         self.gradient_clip_value = gradient_clip_value
 
-        self.metrics = ['recon_loss', 'KL',
-                        'disnt_basal', 'disnt_after',
-                        'r2_mean', 'r2_var',
-                        'adv_loss', 'penalty_adv', 'adv_perts', 'acc_perts', 'penalty_perts']
+        if module.use_intense:
+            self.metrics = ['recon_loss', 'KL',
+                            'disnt_basal', 'disnt_after',
+                            'r2_mean', 'r2_var',
+                            'adv_loss', 'penalty_adv', 'adv_perts', 'acc_perts', 'penalty_perts', 'intense_reg',
+                            'relevance_z1', 'relevance_z2', 'relevance_z3', 'relevance_z12', 'relevance_z13',
+                            'relevance_z23', 'relevance_z123']
+        else:
+            self.metrics = ['recon_loss', 'KL',
+                            'disnt_basal', 'disnt_after',
+                            'r2_mean', 'r2_var',
+                            'adv_loss', 'penalty_adv', 'adv_perts', 'acc_perts', 'penalty_perts']
 
         self.epoch_history = defaultdict(list)
         self.n_adv_perts = n_adv_perts
@@ -368,6 +376,12 @@ class CPATrainingPlan(TrainingPlan):
                     list(filter(lambda p: p.requires_grad, self.module.pert_network.pert_embedding.parameters())) + \
                     list(filter(lambda p: p.requires_grad, self.module.covars_embeddings.parameters()))
 
+        if self.module.use_intense:
+            intense_params = list(filter(lambda p: p.requires_grad, self.module.intense_fusion.parameters()))
+            ae_params = [
+                {"params": ae_params, "weight_decay": self.wd},  # normal AE stuff
+                {"params": intense_params, "weight_decay": 0.0},  # no WD for InTense
+            ]
         if self.module.recon_loss in ['zinb', 'nb']:
             ae_params += [self.module.px_r]
 
@@ -412,12 +426,18 @@ class CPATrainingPlan(TrainingPlan):
                                                        inference_kwargs={
                                                            'mixup_lambda': mixup_lambda,
                                                        })
-
-        recon_loss, kl_loss = self.module.loss(
-            tensors=batch,
-            inference_outputs=inf_outputs,
-            generative_outputs=gen_outputs,
-        )
+        if self.module.use_intense:
+            recon_loss, kl_loss, intense_reg = self.module.loss(
+                tensors=batch,
+                inference_outputs=inf_outputs,
+                generative_outputs=gen_outputs,
+            )
+        else:
+            recon_loss, kl_loss = self.module.loss(
+                tensors=batch,
+                inference_outputs=inf_outputs,
+                generative_outputs=gen_outputs,
+            )
 
         if self.do_start_adv_training:
             if self.adv_steps is None:
@@ -562,6 +582,12 @@ class CPATrainingPlan(TrainingPlan):
         results.update({'r2_mean_lfc': 0.0, 'r2_var_lfc': 0.0})
         results.update({'cpa_metric': 0.0})
         results.update({'disnt_basal': 0.0, 'disnt_after': 0.0})
+        if self.module.use_intense:
+            results.update({'intense_reg': intense_reg.item()})
+
+            relevance_scores = inf_outputs.get('relevance_scores', {})
+            for interaction, score in relevance_scores.items():
+                results[f'relevance_{interaction}'] = score
 
         return results
 
@@ -590,6 +616,8 @@ class CPATrainingPlan(TrainingPlan):
             if len(nc) > 1:
                 self.log(f'acc_{covar}', self.epoch_history[f'acc_{covar}'][-1], prog_bar=True)
 
+        if self.module.use_intense:
+            self.log("intense_reg", self.epoch_history['intense_reg'][-1], prog_bar=True)
         if self.current_epoch > 1 and self.current_epoch % self.step_size_lr == 0:
             sch, sch_doser, sch_adv = self.lr_schedulers()
             sch.step()
@@ -603,12 +631,18 @@ class CPATrainingPlan(TrainingPlan):
                                                        inference_kwargs={
                                                            'mixup_lambda': 1.0,
                                                        })
-
-        recon_loss, kl_loss = self.module.loss(
-            tensors=batch,
-            inference_outputs=inf_outputs,
-            generative_outputs=gen_outputs,
-        )
+        if self.module.use_intense:
+            recon_loss, kl_loss, intense_reg = self.module.loss(
+                tensors=batch,
+                inference_outputs=inf_outputs,
+                generative_outputs=gen_outputs,
+            )
+        else:
+            recon_loss, kl_loss = self.module.loss(
+                tensors=batch,
+                inference_outputs=inf_outputs,
+                generative_outputs=gen_outputs,
+            )
 
         adv_results = {'adv_loss': 0.0, 'cycle_loss': 0.0, 'penalty_adv': 0.0,
                        'adv_perts': 0.0, 'acc_perts': 0.0, 'penalty_perts': 0.0}
@@ -627,6 +661,11 @@ class CPATrainingPlan(TrainingPlan):
         results.update({'KL': kl_loss.item()})
         results.update({'recon_loss': recon_loss.item()})
         results.update({'cpa_metric': r2_mean + 0.5 * r2_var + math.e ** (disnt_after - disnt_basal)})
+        if self.module.use_intense:
+            results.update({'intense_reg': intense_reg.item()})
+            relevance_scores = inf_outputs.get('relevance_scores', {})
+            for interaction, score in relevance_scores.items():
+                results[f'relevance_{interaction}'] = score
 
         return results
 
@@ -651,6 +690,8 @@ class CPATrainingPlan(TrainingPlan):
         self.log('val_r2_mean', self.epoch_history['r2_mean'][-1], prog_bar=True)
         self.log('val_r2_var', self.epoch_history['r2_var'][-1], prog_bar=False)
         self.log('val_KL', self.epoch_history['KL'][-1], prog_bar=True)
+        if self.module.use_intense:
+            self.log("intense_reg", self.epoch_history['intense_reg'][-1], prog_bar=True)
 
         if self.current_epoch % self.n_epochs_verbose == self.n_epochs_verbose - 1:
             print(f'\ndisnt_basal = {self.epoch_history["disnt_basal"][-1]}')
