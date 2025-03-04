@@ -90,7 +90,7 @@ plan_kwargs_keys = list(train_args.keys())
 
 # Trainer arguments
 trainer_actual_args = {
-    'max_epochs': 200,
+    'max_epochs': 2000,
     'use_gpu': True,
     'early_stopping_patience': 10,
     'check_val_every_n_epoch': 5,
@@ -129,8 +129,8 @@ model.setup_anndata(adata, **setup_anndata_kwargs)
 
 # Resources matching XEON_SP_4215 node with Tesla V100
 resources = {
-    "cpu": 8,
-    "gpu": 1,
+    "cpu": 10,
+   # "gpu": 1,
     "memory": 32 * 1024 * 1024 * 1024  # 32 GiB
 }
 

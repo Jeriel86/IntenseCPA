@@ -586,7 +586,6 @@ class CPATrainingPlan(TrainingPlan):
         results.update({'disnt_basal': 0.0, 'disnt_after': 0.0})
         if self.module.use_intense:
             results.update({'intense_reg': intense_reg.item()})
-
             relevance_scores = inf_outputs.get('relevance_scores', {})
             for interaction, score in relevance_scores.items():
                 results[f'relevance_{interaction}'] = score
