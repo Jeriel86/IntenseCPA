@@ -385,7 +385,7 @@ class CPATrainingPlan(TrainingPlan):
                 {"params": ae_params, "weight_decay": self.wd},  # normal AE stuff
                 {"params": intense_params, "weight_decay": 0.0},  # no WD for InTense
             ]
-            optimizer_autoencoder = torch.optim.Adam(ae_params,lr=self.lr)
+            optimizer_autoencoder = torch.optim.SGD(ae_params,lr=self.lr)
         else:
             optimizer_autoencoder = torch.optim.Adam(
                 ae_params,
