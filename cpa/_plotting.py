@@ -1315,7 +1315,7 @@ def plot_history(model: CPA, save_path: Optional[str] = None):
                                   valid_df[col].values,
                                   label='valid')
 
-        ax[row, col_idx].set_title(df.columns[i + 2], fontweight="bold")
+        ax[row, col_idx].set_title(col, fontweight="bold")
 
         # Add legend to the last plot in the grid
         if i == n_metrics - 1:

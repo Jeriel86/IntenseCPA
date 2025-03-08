@@ -10,8 +10,9 @@ import os
 PROJECT_ROOT = "/home/nmbiedou/Documents/cpa"
 ORIGINAL_DATA_PATH = os.path.join(PROJECT_ROOT, "datasets", "kang_normalized_hvg.h5ad")
 PREPROCESSED_DATA_PATH = os.path.join(PROJECT_ROOT, "datasets", "kang_normalized_hvg_preprocessed.h5ad")
-LOGGING_DIR = os.path.join(PROJECT_ROOT, "lightning_logs")
+LOGGING_DIR = os.getenv("SLURM_TMPDIR", os.path.join(PROJECT_ROOT, "lightning_logs"))
 
+#os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
 # Check if preprocessed data exists; if not, create and save it
 if not os.path.exists(PREPROCESSED_DATA_PATH):
     # Load original data
@@ -52,7 +53,7 @@ model_args = {
     'dropout_rate_decoder': tune.choice([0.0, 0.1, 0.2, 0.25]),
     'variational': tune.choice([False]),
     'seed': tune.randint(0, 10000),
-    'split_key': 'split_1ct_MEC',
+    'split_key': 'split_B',
     'train_split': 'train',
     'valid_split': 'valid',
     'test_split': 'ood',
@@ -94,7 +95,7 @@ plan_kwargs_keys = list(train_args.keys())
 trainer_actual_args = {
     'max_epochs': 2000,
     'use_gpu': False,
-    'early_stopping_patience': 10,
+    'early_stopping_patience':  tune.choice([5, 10, 15]),
     'check_val_every_n_epoch': 5,
 }
 train_args.update(trainer_actual_args)
@@ -109,7 +110,7 @@ search_space = {
 scheduler_kwargs = {
     'max_t': 1000,
     'grace_period': 5,
-    'reduction_factor': 4,
+    'reduction_factor': 3,
 }
 
 # AnnData setup arguments (from Kang notebook)
@@ -131,9 +132,9 @@ model.setup_anndata(adata, **setup_anndata_kwargs)
 
 # Resources matching XEON_SP_4215 node with Tesla V100
 resources = {
-    "cpu": 10,
-   # "gpu": 1,
-    "memory": 100 * 1024 * 1024 * 1024  # 32 GiB
+    "cpu": 24,
+    #"gpu": 1,
+    "memory": 200 * 1024 * 1024 * 1024  # 183 GiB
 }
 
 # Run hyperparameter tuning
@@ -143,7 +144,7 @@ experiment = run_autotune(
     metrics=["cpa_metric", "disnt_basal", "disnt_after", "r2_mean", "val_r2_mean", "val_r2_var", "val_recon"],
     mode="max",
     search_space=search_space,
-    num_samples=5000,
+    num_samples=100,
     scheduler="asha",
     searcher="hyperopt",
     seed=1,
