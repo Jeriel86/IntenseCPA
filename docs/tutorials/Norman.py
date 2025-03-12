@@ -29,12 +29,17 @@ import matplotlib.pyplot as plt
 sc.settings.set_figure_params(dpi=100)
 
 # Define data path
+# Print and change current directory
+print("Current directory:", os.getcwd())
+os.chdir("../..")  # Adjust this based on your starting directory
+print("New directory:", os.getcwd())
 current_dir = os.getcwd()
 data_path = os.path.join(current_dir, "datasets", "Norman2019_normalized_hvg.h5ad")
 
 # Define save path for the results(model, images, csv)
 save_path = os.path.join(current_dir, 'lightning_logs', 'Norman')
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 # Load dataset
 try:
     adata = sc.read(data_path)
@@ -59,47 +64,47 @@ cpa.CPA.setup_anndata(adata,
 
 # Define model parameters
 model_params = {
-    "n_latent": 32,
-    "recon_loss": "nb",
-    "doser_type": "linear",
-    "n_hidden_encoder": 256,
-    "n_layers_encoder": 4,
-    "n_hidden_decoder": 256,
-    "n_layers_decoder": 2,
-    "use_batch_norm_encoder": True,
-    "use_layer_norm_encoder": False,
-    "use_batch_norm_decoder": False,
-    "use_layer_norm_decoder": False,
-    "dropout_rate_encoder": 0.2,
-    "dropout_rate_decoder": 0.0,
-    "variational": False,
-    "seed": 8206,
-    "use_intense": False
+    "n_latent": 128,                    # Increased latent space size
+    "recon_loss": "nb",                 # Negative binomial reconstruction loss
+    "doser_type": "linear",             # Linear doser type
+    "n_hidden_encoder": 256,            # Encoder hidden units
+    "n_layers_encoder": 1,              # Reduced encoder layers
+    "n_hidden_decoder": 512,            # Increased decoder hidden units
+    "n_layers_decoder": 5,              # Increased decoder layers
+    "use_batch_norm_encoder": True,     # Batch norm in encoder
+    "use_layer_norm_encoder": False,    # No layer norm in encoder
+    "use_batch_norm_decoder": False,    # No batch norm in decoder
+    "use_layer_norm_decoder": False,    # No layer norm in decoder
+    "dropout_rate_encoder": 0.25,       # Slightly increased encoder dropout
+    "dropout_rate_decoder": 0.2,        # Added decoder dropout
+    "variational": False,               # Non-variational model
+    "seed": 9010,                       # Updated seed
+    "use_intense": True,                # Enable intense regularization
+    "intense_reg_rate": 0.05,           # Intensity regularization rate
 }
-
-# Define trainer parameters
+# Define trainer parameters (updated from "train_args")
 trainer_params = {
-    "n_epochs_kl_warmup": None,
-    "n_epochs_adv_warmup": 50,
-    "n_epochs_mixup_warmup": 10,
-    "n_epochs_pretrain_ae": 10,
-    "mixup_alpha": 0.1,
-    "lr": 0.0001,
-    "wd": 3.2170178270865573e-06,
-    "adv_steps": 3,
-    "reg_adv": 10.0,
-    "pen_adv": 20.0,
-    "adv_lr": 0.0001,
-    "adv_wd": 7.051355554517135e-06,
-    "n_layers_adv": 2,
-    "n_hidden_adv": 128,
-    "use_batch_norm_adv": True,
-    "use_layer_norm_adv": False,
-    "dropout_rate_adv": 0.3,
-    "step_size_lr": 25,
-    "do_clip_grad": False,
-    "adv_loss": "cce",
-    "gradient_clip_value": 5.0,
+    "n_epochs_kl_warmup": None,         # No KL warmup
+    "n_epochs_adv_warmup": 1,           # Reduced adversarial warmup
+    "n_epochs_mixup_warmup": 1,         # Reduced mixup warmup
+    "n_epochs_pretrain_ae": 3,          # Reduced pretraining epochs
+    "mixup_alpha": 0.5,                 # Increased mixup strength
+    "lr": 0.00019662186085984122,      # Learning rate
+    "wd": 1.6225757449999367e-08,      # Weight decay
+    "adv_steps": 3,                     # Adversarial steps
+    "reg_adv": 0.3892674000347504,     # Adversarial regularization
+    "pen_adv": 0.36097151881121287,    # Adversarial penalty
+    "adv_lr": 0.002455537115440242,    # Adversarial learning rate
+    "adv_wd": 9.607119555361394e-08,   # Adversarial weight decay
+    "n_layers_adv": 4,                  # Increased adversarial layers
+    "n_hidden_adv": 128,                # Adversarial hidden units
+    "use_batch_norm_adv": True,         # Batch norm in adversary
+    "use_layer_norm_adv": False,        # No layer norm in adversary
+    "dropout_rate_adv": 0.1,            # Reduced adversarial dropout
+    "step_size_lr": 45,                 # Learning rate scheduler step size
+    "do_clip_grad": False,              # No gradient clipping
+    "adv_loss": "cce",                  # Categorical cross-entropy adversarial loss
+    "gradient_clip_value": 5.0,         # Gradient clip value (unused since do_clip_grad=False)
 }
 
 # Split dataset: Leave DUSP9+ETS2 and CBL+CNN1 out of training dataset
@@ -121,7 +126,7 @@ model.train(max_epochs=2000,
             plan_kwargs=trainer_params,
             early_stopping_patience=5,
             check_val_every_n_epoch=5,
-            save_path=os.path.join(current_dir, 'lightning_logs', 'Norman2019'))
+            save_path=os.path.join(current_dir, 'lightning_logs', 'Norman2019_Optimized'))
 
 # Plot training history and save to file
 plot_path = os.path.join(save_path, "figures", 'norman_training_history.png')

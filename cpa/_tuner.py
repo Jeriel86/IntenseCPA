@@ -577,6 +577,8 @@ def _trainable(
         "callbacks": [experiment.metrics_callback],
         **actual_train_args,
     }
+    import jax
+    print("Worker JAX devices:", jax.devices())
 
     settings.seed = experiment.seed
     if adata_path is not None:
@@ -591,6 +593,10 @@ def _trainable(
                     **train_args)
         del adata
         import gc
+        import torch
+        import os
+        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
+        torch.cuda.empty_cache()
         gc.collect()
     elif isinstance(experiment.data, (AnnData, MuData)):
         getattr(experiment.model_cls, experiment.setup_method_name)(
@@ -711,6 +717,9 @@ def run_autotune(
     :class:`~scvi.autotune.AutotuneExperiment`
     """
     from ray import init
+    import os
+
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
     experiment = AutotuneExperiment(
         model_cls,
