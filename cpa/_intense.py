@@ -16,7 +16,8 @@ class MKLFusion(nn.Module):
             in_features: dict[str, int],
             out_features: int,
             bias: bool = True,
-            reg_rate: float = 0.01
+            reg_rate: float = 0.01,
+            intense_p: int = 1
     ):
         """Initialize the MKLFusion module
         Args:
@@ -38,6 +39,7 @@ class MKLFusion(nn.Module):
             bias=bias
         )
         self.reg_rate = reg_rate
+        self.p = intense_p
 
 
     @property
@@ -54,15 +56,15 @@ class MKLFusion(nn.Module):
         tensors = torch.cat(tensors, dim=1)
         return self.fusion_layer(tensors)
 
-    def regularizer(self, p=1):
-        q = 2 * p / (p + 1)
+    def regularizer(self):
+        q = 2 * self.p / (self.p + 1)
         return self.reg_rate * torch.sum(self.weight_norms() ** q) ** (2 / q)
 
-    def scores(self, p=1):
+    def scores(self):
         with torch.no_grad():
             norms = self.weight_norms()
-            a = norms ** (2 / (p + 1))
-            b = torch.sum(norms ** (2 * p / (p + 1))) ** (1 / p)
+            a = norms ** (2 / (self.p + 1))
+            b = torch.sum(norms ** (2 * self.p / (self.p + 1))) ** (1 / self.p)
             scores = a / b
             scores = scores.numpy()
             return dict(zip(self.in_features.keys(), scores))
@@ -114,7 +116,8 @@ class InTense(nn.Module):
         feature_dim_dict_triple: dict[str, int],
         track_running_stats: bool = True,
         out_features: int = 1,
-        intense_reg_rate: float = 0.01
+        intense_reg_rate: float = 0.01,
+        intense_p: int = 1
     ):
         super().__init__()
 
@@ -173,7 +176,8 @@ class InTense(nn.Module):
             in_features=in_feats,
             out_features=out_features,
             bias=True,
-            reg_rate=intense_reg_rate
+            reg_rate=intense_reg_rate,
+            intense_p= intense_p
         )
 
     def forward(self, z_dict: dict[str, torch.Tensor]) -> torch.Tensor:

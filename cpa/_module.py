@@ -90,6 +90,7 @@ class CPAModule(BaseModuleClass):
                  seed: int = 0,
                  use_intense: bool = False,
                  intense_reg_rate: float = 0.01,
+                 intense_p: int = 1
                  ):
         super().__init__()
 
@@ -130,7 +131,8 @@ class CPAModule(BaseModuleClass):
                 feature_dim_dict_triple=feature_dim_dict_triple,
                 track_running_stats=True,
                 out_features=n_latent,  # final output dimension = n_latent
-                intense_reg_rate=intense_reg_rate
+                intense_reg_rate=intense_reg_rate,
+                intense_p= intense_p
             )
 
         if variational:

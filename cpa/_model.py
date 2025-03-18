@@ -30,6 +30,7 @@ from scvi.utils import setup_anndata_dsp
 from tqdm import tqdm
 
 from ._module import CPAModule
+from ._trainer import CPATrainRunner
 from ._utils import CPA_REGISTRY_KEYS
 from ._task import CPATrainingPlan
 from ._data import AnnDataSplitter

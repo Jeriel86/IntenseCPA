@@ -570,16 +570,17 @@ def _trainable(
             plan_kwargs[key] = train_args[key]
         else:
             actual_train_args[key] = train_args[key]
-
+    import jax
+    print("Worker JAX devices:", jax.devices())
+    num_gpus = len(jax.devices())
+    print(f"Detected {num_gpus} available GPUs")
     train_args = {
         "enable_progress_bar": True,
         "logger": experiment.get_logger(get_context().get_trial_name()),
         "callbacks": [experiment.metrics_callback],
+        "num_gpus": num_gpus,
         **actual_train_args,
     }
-    import jax
-    print("Worker JAX devices:", jax.devices())
-
     settings.seed = experiment.seed
     if adata_path is not None:
         adata = sc.read_h5ad(adata_path)
@@ -593,10 +594,6 @@ def _trainable(
                     **train_args)
         del adata
         import gc
-        import torch
-        import os
-        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
-        torch.cuda.empty_cache()
         gc.collect()
     elif isinstance(experiment.data, (AnnData, MuData)):
         getattr(experiment.model_cls, experiment.setup_method_name)(
