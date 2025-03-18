@@ -456,6 +456,7 @@ class CPA(BaseModelClass):
         save_path: Optional[str] = None,
         check_val_every_n_epoch: int = 10,
         early_stopping_patience: int = 10,
+        num_gpus: Optional[int] = None,
         **trainer_kwargs,
     ):
         """
@@ -539,7 +540,7 @@ class CPA(BaseModelClass):
             **plan_kwargs,
             drug_weights=drug_weights,
         )
-        trainer_kwargs["early_stopping"] = False
+        #trainer_kwargs["early_stopping"] = False
         trainer_kwargs["check_val_every_n_epoch"] = check_val_every_n_epoch
 
         es_callback = EarlyStopping(
@@ -565,14 +566,12 @@ class CPA(BaseModelClass):
         )
         trainer_kwargs["callbacks"].append(checkpoint)
 
-        self.runner = TrainRunner(
+        self.runner = CPATrainRunner(
             self,
             training_plan=self.training_plan,
             data_splitter=data_splitter,
             max_epochs=max_epochs,
-            use_gpu=use_gpu,
-            early_stopping_monitor="cpa_metric",
-            early_stopping_mode="max",
+            num_gpus=num_gpus,
             **trainer_kwargs,
         )
         self.runner()
@@ -580,6 +579,8 @@ class CPA(BaseModelClass):
         self.epoch_history = pd.DataFrame().from_dict(self.training_plan.epoch_history)
         if save_path is not False:
             self.save(save_path, overwrite=True)
+        print("Training finished, setting is_trained_ to True")
+        self.is_trained_ = True
 
     @torch.no_grad()
     def get_latent_representation(
