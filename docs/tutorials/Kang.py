@@ -39,13 +39,13 @@ import scanpy as sc
 # --- Setting up environment ---
 
 # Print and change current directory
-print("Current directory:", os.getcwd())
-os.chdir("../..")  # Adjust this based on your starting directory
-print("New directory:", os.getcwd())
-current_dir = os.getcwd()
+#print("Current directory:", os.getcwd())
+#os.chdir("../..")  # Adjust this based on your starting directory
+#print("New directory:", os.getcwd())
+current_dir = "/home/nmbiedou/Documents/cpa"
 
 # Uncomment to set GPU visibility
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5'
 
 # Set Scanpy figure parameters
 sc.settings.set_figure_params(dpi=100)
@@ -206,9 +206,10 @@ model.train(
     use_gpu=True,  # Set to True if GPU is available
     batch_size=512,
     plan_kwargs=trainer_params,
-    early_stopping_patience=10,
+    early_stopping_patience=15,
     check_val_every_n_epoch=5,
-    save_path=save_path
+    save_path=save_path,
+    num_gpus=8
 )
 
 plot_path = os.path.join(save_path, "history.png")
@@ -226,29 +227,29 @@ cpa.pl.plot_history(model,plot_path)
 
 # Get latent representations
 latent_outputs = model.get_latent_representation(adata, batch_size=2048)
-print(latent_outputs.keys())
+#print(latent_outputs.keys())
 
 # Basal latent space
-#sc.pp.neighbors(latent_outputs['latent_basal'])
-#sc.tl.umap(latent_outputs['latent_basal'])
-#sc.pl.umap(
-#    latent_outputs['latent_basal'],
-#    color=['condition', 'cell_type'],
-#    frameon=False,
-#    wspace=0.3,
-#    save='latent_basal.png'  # Saves the plot as a file
-#)
+sc.pp.neighbors(latent_outputs['latent_basal'])
+sc.tl.umap(latent_outputs['latent_basal'])
+sc.pl.umap(
+    latent_outputs['latent_basal'],
+    color=['condition', 'cell_type'],
+    frameon=False,
+    wspace=0.3,
+    save=save_path+'latent_basal_incpa.png'  # Saves the plot as a file
+)
 
 # Final latent space (after condition and cell_type embeddings)
-#sc.pp.neighbors(latent_outputs['latent_after'])
-#sc.tl.umap(latent_outputs['latent_after'])
-#sc.pl.umap(
-#    latent_outputs['latent_after'],
-#    color=['condition', 'cell_type'],
-#    frameon=False,
-#    wspace=0.3,
-#    save='latent_after.png'  # Saves the plot as a file
-#)
+sc.pp.neighbors(latent_outputs['latent_after'])
+sc.tl.umap(latent_outputs['latent_after'])
+sc.pl.umap(
+    latent_outputs['latent_after'],
+    color=['condition', 'cell_type'],
+    frameon=False,
+    wspace=0.3,
+    save=save_path+'latent_after_incpa.png'  # Saves the plot as a file
+)
 
 # --- Evaluation ---
 
@@ -305,7 +306,7 @@ df = pd.DataFrame(results)
 print(df)
 
 # Optional: Save results to CSV
-#df.to_csv(os.path.join(save_path, 'evaluation_results.csv'), index=False)
+df.to_csv(os.path.join(save_path, 'evaluation_results.csv'), index=False)
 
 if __name__ == "__main__":
     pass  # Ensures script runs only if executed directly
