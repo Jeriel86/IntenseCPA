@@ -238,7 +238,7 @@ class CPATrainingPlan(TrainingPlan):
                 return slope * proportion
             else:
                 return slope
-        elif self.n_epochs_adv_warmup is not None:
+        elif self.n_epochs_adv_warmup is not None and self.n_epochs_adv_warmup != 0:
             current_epoch = self.current_epoch
 
             if self.n_epochs_pretrain_ae:
@@ -586,9 +586,6 @@ class CPATrainingPlan(TrainingPlan):
         results.update({'disnt_basal': 0.0, 'disnt_after': 0.0})
         if self.module.use_intense:
             results.update({'intense_reg': intense_reg.item()})
-            relevance_scores = inf_outputs.get('relevance_scores', {})
-            for interaction, score in relevance_scores.items():
-                results[f'relevance_{interaction}'] = score
 
         return results
 
@@ -596,8 +593,15 @@ class CPATrainingPlan(TrainingPlan):
         for key in self.metrics:
             if key in ['disnt_basal', 'disnt_after']:
                 self.epoch_history[key].append(0.0)
-            else:
-                self.epoch_history[key].append(np.mean([output[key] for output in outputs if output[key] != 0.0]))
+            elif key not in ['relevance_z1', 'relevance_z2', 'relevance_z3', 'relevance_z12',
+                           'relevance_z13', 'relevance_z23', 'relevance_z123']:
+                self.epoch_history[key].append(
+                    np.mean([output[key] for output in outputs if output[key] != 0.0])
+                )
+        if self.module.use_intense:
+            relevance_scores = self.module.intense_fusion.mkl_fusion.scores()
+            for interaction, score in relevance_scores.items():
+                self.epoch_history[f'relevance_{interaction}'].append(score)
 
         for covar, unique_covars in self.covars_encoder.items():
             if len(unique_covars) > 1:
@@ -664,15 +668,21 @@ class CPATrainingPlan(TrainingPlan):
         results.update({'cpa_metric': r2_mean + 0.5 * r2_var + math.e ** (disnt_after - disnt_basal)})
         if self.module.use_intense:
             results.update({'intense_reg': intense_reg.item()})
-            relevance_scores = inf_outputs.get('relevance_scores', {})
-            for interaction, score in relevance_scores.items():
-                results[f'relevance_{interaction}'] = score
 
         return results
 
     def validation_epoch_end(self, outputs):
         for key in self.metrics:
-            self.epoch_history[key].append(np.mean([output[key] for output in outputs if output[key] != 0.0]))
+            #self.epoch_history[key].append(np.mean([output[key] for output in outputs if output[key] != 0.0]))
+                if key not in ['relevance_z1', 'relevance_z2', 'relevance_z3', 'relevance_z12',
+                               'relevance_z13', 'relevance_z23', 'relevance_z123']:
+                    self.epoch_history[key].append(np.mean([output[key] for output in outputs if output[key] != 0.0]))
+
+        # Compute relevance scores using final weights
+        if self.module.use_intense:
+            relevance_scores = self.module.intense_fusion.mkl_fusion.scores()
+            for interaction, score in relevance_scores.items():
+                self.epoch_history[f'relevance_{interaction}'].append(score)
 
         for covar, unique_covars in self.covars_encoder.items():
             if len(unique_covars) > 1:

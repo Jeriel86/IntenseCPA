@@ -60,7 +60,7 @@ model_args = {
     'test_split': 'ood',
     'use_intense': True,
     'intense_reg_rate': tune.choice([0.0, 0.001, 0.005, 0.01, 0.05, 0.1]),
-    #'intense_track_running_stats': tune.choice([True, False])
+    'intense_p': tune.choice([1, 2])
 }
 
 # Training hyperparameters for tuning
@@ -90,7 +90,6 @@ train_args = {
     'do_clip_grad': tune.choice([True, False]),
     'gradient_clip_value': tune.choice([1.0]),
     'step_size_lr': tune.choice([10, 25, 45]),
-    'batch_size': tune.choice([128, 256, 512])
 }
 plan_kwargs_keys = list(train_args.keys())
 
@@ -135,9 +134,9 @@ model.setup_anndata(adata, **setup_anndata_kwargs)
 
 # Resources matching XEON_SP_4215 node with Tesla V100
 resources = {
-    "cpu": 40,
-    "gpu": 4,
-    "memory": 300 * 1024 * 1024 * 1024  # 183 GiB
+    "cpu": 7,
+    "gpu": 5,
+    "memory": 100 * 1024 * 1024 * 1024  # 183 GiB
 }
 
 # Run hyperparameter tuning
@@ -158,7 +157,7 @@ experiment = run_autotune(
     sub_sample=0.1,
     setup_anndata_kwargs=setup_anndata_kwargs,
     use_wandb=True,
-    wandb_name="cpa_tune",
+    wandb_name="cpa_kang_tune_2003",
     scheduler_kwargs=scheduler_kwargs,
     plan_kwargs_keys=plan_kwargs_keys,
 )

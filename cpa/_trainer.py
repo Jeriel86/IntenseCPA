@@ -4,7 +4,6 @@ import pytorch_lightning as pl
 import torch
 from scvi.model.base import BaseModelClass
 from scvi.dataloaders import DataSplitter, SemiSupervisedDataSplitter
-import jax
 
 class CPATrainRunner(SCVITrainRunner):
     """Custom TrainRunner for CPA to support multi-GPU training."""
@@ -18,6 +17,8 @@ class CPATrainRunner(SCVITrainRunner):
         num_gpus: Optional[int] = None,
         **trainer_kwargs,
     ):
+        if use_gpu :
+            num_gpus = torch.cuda.device_count()
         # Determine accelerator, devices, and strategy based on inputs
         if num_gpus is not None and isinstance(num_gpus, int) and num_gpus > 1:
             accelerator = "gpu"
@@ -53,6 +54,7 @@ class CPATrainRunner(SCVITrainRunner):
 
         # Set up the Trainer directly, avoiding parent class conflicts
         self.trainer = pl.Trainer(
+            auto_select_gpus=True,
             max_epochs=max_epochs,
             **trainer_kwargs,
         )

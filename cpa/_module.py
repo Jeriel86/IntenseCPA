@@ -346,23 +346,7 @@ class CPAModule(BaseModuleClass):
         z_no_pert = z_basal + z_covs
         z_no_pert_corrected = z_basal + z_covs_wo_batch
 
-        if self.use_intense:
-            relevance_scores = self.intense_fusion.get_relevance_score();
-            return dict(
-                z=z,
-                z_corrected=z_corrected,
-                z_no_pert=z_no_pert,
-                z_no_pert_corrected=z_no_pert_corrected,
-                z_basal=z_basal,
-                z_covs=z_covs,
-                z_pert=z_pert.sum(dim=1),
-                library=library,
-                qz=qz,
-                mixup_lambda=mixup_lambda,
-                relevance_scores = relevance_scores
-            )
-        else:
-            return dict(
+        return dict(
                 z=z,
                 z_corrected=z_corrected,
                 z_no_pert=z_no_pert,
