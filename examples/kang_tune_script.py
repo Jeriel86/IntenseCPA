@@ -10,7 +10,7 @@ import os
 PROJECT_ROOT = "/home/nmbiedou/Documents/cpa"
 ORIGINAL_DATA_PATH = os.path.join(PROJECT_ROOT, "datasets", "kang_normalized_hvg.h5ad")
 PREPROCESSED_DATA_PATH = os.path.join(PROJECT_ROOT, "datasets", "kang_normalized_hvg_preprocessed.h5ad")
-LOGGING_DIR = os.getenv("SLURM_TMPDIR", os.path.join(PROJECT_ROOT, "autotune"))
+LOGGING_DIR = os.getenv("LOGGING_DIR", "/scratch/nmbiedou/autotune")
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
@@ -37,23 +37,21 @@ sc.pp.subsample(adata, fraction=0.1)
 
 # Model hyperparameters for tuning
 model_args = {
-    'n_latent': tune.choice([32, 64, 128, 256]),
-    'recon_loss': tune.choice(['nb']),
-    'doser_type': tune.choice(['logsigm']),
-    'n_hidden_encoder': tune.choice([128, 256, 512, 1024]),
-    'n_layers_encoder': tune.choice([1, 2, 3, 4, 5]),
-    'n_hidden_decoder': tune.choice([128, 256, 512, 1024]),
-    'n_layers_decoder': tune.choice([1, 2, 3, 4, 5]),
-    'use_batch_norm_encoder': tune.choice([True, False]),
-    'use_layer_norm_encoder': tune.sample_from(
-        lambda spec: False if spec.config.model_args.use_batch_norm_encoder else np.random.choice([True, False])),
-    'use_batch_norm_decoder': tune.choice([True, False]),
-    'use_layer_norm_decoder': tune.sample_from(
-        lambda spec: False if spec.config.model_args.use_batch_norm_decoder else np.random.choice([True, False])),
-    'dropout_rate_encoder': tune.choice([0.0, 0.1, 0.2, 0.25]),
-    'dropout_rate_decoder': tune.choice([0.0, 0.1, 0.2, 0.25]),
-    'variational': tune.choice([False]),
-    'seed': tune.randint(0, 10000),
+    "n_latent": 64,
+    "recon_loss": "nb",
+    "doser_type": "linear",
+    "n_hidden_encoder": 128,
+    "n_layers_encoder": 2,
+    "n_hidden_decoder": 512,
+    "n_layers_decoder": 2,
+    "use_batch_norm_encoder": True,
+    "use_layer_norm_encoder": False,
+    "use_batch_norm_decoder": False,
+    "use_layer_norm_decoder": True,
+    "dropout_rate_encoder": 0.0,
+    "dropout_rate_decoder": 0.1,
+    "variational": False,
+    "seed": 6977,
     'split_key': 'split_B',
     'train_split': 'train',
     'valid_split': 'valid',
@@ -110,9 +108,9 @@ search_space = {
 
 # Scheduler settings for ASHA
 scheduler_kwargs = {
-    'max_t': 200,
+    'max_t': 1000,
     'grace_period': 5,
-    'reduction_factor': 3,
+    'reduction_factor': 4,
 }
 
 # AnnData setup arguments (from Kang notebook)
@@ -134,8 +132,8 @@ model.setup_anndata(adata, **setup_anndata_kwargs)
 
 # Resources matching XEON_SP_4215 node with Tesla V100
 resources = {
-    "cpu": 7,
-    "gpu": 5,
+    "cpu": 40,
+    "gpu": 8,
     "memory": 100 * 1024 * 1024 * 1024  # 183 GiB
 }
 
@@ -146,18 +144,18 @@ experiment = run_autotune(
     metrics=["cpa_metric", "disnt_basal", "disnt_after", "r2_mean", "val_r2_mean", "val_r2_var", "val_recon"],
     mode="max",
     search_space=search_space,
-    num_samples=300,
+    num_samples=100,
     scheduler="asha",
     searcher="hyperopt",
     seed=1,
     resources=resources,
-    experiment_name="kang_autotune",
+    experiment_name="kang_autotune_2103_1",
     logging_dir=LOGGING_DIR,
     adata_path=PREPROCESSED_DATA_PATH,  # Use preprocessed data path
-    sub_sample=0.1,
+    sub_sample=None,
     setup_anndata_kwargs=setup_anndata_kwargs,
     use_wandb=True,
-    wandb_name="cpa_kang_tune_2003",
+    wandb_name="cpa_kang_tune_2103_1",
     scheduler_kwargs=scheduler_kwargs,
     plan_kwargs_keys=plan_kwargs_keys,
 )
