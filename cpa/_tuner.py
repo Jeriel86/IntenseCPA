@@ -570,15 +570,11 @@ def _trainable(
             plan_kwargs[key] = train_args[key]
         else:
             actual_train_args[key] = train_args[key]
-    import jax
-    print("Worker JAX devices:", jax.devices())
-    num_gpus = len(jax.devices())
-    print(f"Detected {num_gpus} available GPUs")
     train_args = {
         "enable_progress_bar": True,
         "logger": experiment.get_logger(get_context().get_trial_name()),
         "callbacks": [experiment.metrics_callback],
-        "num_gpus": num_gpus,
+        "devices": "auto",
         **actual_train_args,
     }
     settings.seed = experiment.seed

@@ -14,10 +14,11 @@ class AnnDataSplitter(DataSplitter):
             valid_indices,
             test_indices,
             use_gpu: bool = False,
+            num_workers: int = 0,
             **kwargs,
     ):
         super().__init__(adata_manager)
-        self.data_loader_kwargs = kwargs
+        self.data_loader_kwargs = {"num_workers": num_workers, **kwargs}
         self.use_gpu = use_gpu
         self.train_idx = train_indices
         self.val_idx = valid_indices
