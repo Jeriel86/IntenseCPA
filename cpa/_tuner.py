@@ -574,7 +574,7 @@ def _trainable(
         "enable_progress_bar": True,
         "logger": experiment.get_logger(get_context().get_trial_name()),
         "callbacks": [experiment.metrics_callback],
-        "devices": "auto",
+        #"devices": "auto",
         **actual_train_args,
     }
     settings.seed = experiment.seed

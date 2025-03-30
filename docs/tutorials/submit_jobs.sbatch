@@ -6,7 +6,7 @@
 #SBATCH -n 1                    # 1 task
 #SBATCH --cpus-per-task=8       # 8 CPU cores per task
 #SBATCH -N 1                    # 1 node
-#SBATCH --gpus=v100:8           # 1 Tesla V100 GPU
+#SBATCH --gpus=a100:1           # 1 Tesla V100 GPU
 #SBATCH --partition=gpuidle     # Target gpuidle partition
 #SBATCH --output=/home/nmbiedou/Documents/cpa/lightning_logs/slurm_%A_%a.out  # Output log
 #SBATCH --error=/home/nmbiedou/Documents/cpa/lightning_logs/slurm_%A_%a.err   # Error log

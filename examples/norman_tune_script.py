@@ -10,17 +10,14 @@ import os
 PROJECT_ROOT = "/home/nmbiedou/Documents/cpa"
 ORIGINAL_DATA_PATH = os.path.join(PROJECT_ROOT, "datasets", "Norman2019_normalized_hvg.h5ad")
 PREPROCESSED_DATA_PATH = os.path.join(PROJECT_ROOT, "datasets", "Norman2019_normalized_hvg_preprocessed.h5ad")
-LOGGING_DIR = os.path.join(PROJECT_ROOT,"autotune" ,"Norman_autotune")
+LOGGING_DIR = os.getenv("LOGGING_DIR", "/scratch/nmbiedou/autotune")
 
-os.makedirs(LOGGING_DIR, exist_ok=True)
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
 if not os.path.exists(PREPROCESSED_DATA_PATH):
     # Load original data
     adata = sc.read_h5ad(ORIGINAL_DATA_PATH)
     adata.X = adata.layers['counts'].copy()  # Set raw counts
-
-    # Subsample the data to speed up tuning (optional)
-    sc.pp.subsample(adata, fraction=0.1)
 
     # Create data splits: 85% train, 15% valid, and specific conditions as out-of-distribution (ood)
     adata.obs['split'] = np.random.choice(['train', 'valid'], size=adata.n_obs, p=[0.85, 0.15])
@@ -36,31 +33,24 @@ adata = sc.read_h5ad(PREPROCESSED_DATA_PATH)
 
 # Define model arguments with a search space for hyperparameter tuning
 model_args = {
-    'n_latent': tune.choice([32, 64, 128, 256]),
-    'recon_loss': tune.choice(['nb']),  # Negative binomial loss as used in the reference script
-    'doser_type': tune.choice(['linear', 'logsigm']),  # Include 'linear' from the reference script
-
-    'n_hidden_encoder': tune.choice([128, 256, 512, 1024]),
-    'n_layers_encoder': tune.choice([1, 2, 3, 4, 5]),
-
-    'n_hidden_decoder': tune.choice([128, 256, 512, 1024]),
-    'n_layers_decoder': tune.choice([1, 2, 3, 4, 5]),
-
-    'use_batch_norm_encoder': tune.choice([True, False]),
-    'use_layer_norm_encoder': tune.sample_from(
-        lambda spec: False if spec.config.model_args.use_batch_norm_encoder else np.random.choice([True, False])),
-
-    'use_batch_norm_decoder': tune.choice([True, False]),
-    'use_layer_norm_decoder': tune.sample_from(
-        lambda spec: False if spec.config.model_args.use_batch_norm_decoder else np.random.choice([True, False])),
-
-    'dropout_rate_encoder': tune.choice([0.0, 0.1, 0.2, 0.25]),
-    'dropout_rate_decoder': tune.choice([0.0, 0.1, 0.2, 0.25]),
-
-    'variational': tune.choice([False]),  # Non-variational model as in the reference script
-    'seed': tune.randint(0, 10000),
+    "n_latent": 32,
+    "recon_loss": "nb",
+    "doser_type": "linear",
+    "n_hidden_encoder": 256,
+    "n_layers_encoder": 4,
+    "n_hidden_decoder": 256,
+    "n_layers_decoder": 2,
+    "use_batch_norm_encoder": True,
+    "use_layer_norm_encoder": False,
+    "use_batch_norm_decoder": False,
+    "use_layer_norm_decoder": False,
+    "dropout_rate_encoder": 0.2,
+    "dropout_rate_decoder": 0.0,
+    "variational": False,
+    "seed": 8206,
     'use_intense': True,
-    'intense_reg_rate':  0.05,
+    'intense_reg_rate': tune.choice([0.001, 0.005, 0.01, 0.05, 0.1]),
+    'intense_p': tune.choice([1, 2]),
 
     'split_key': 'split',  # Use the custom 'split' column created above
     'train_split': 'train',
@@ -115,8 +105,8 @@ plan_kwargs_keys = list(train_args.keys())
 
 # Additional trainer arguments
 trainer_actual_args = {
-    'max_epochs': 200,
-    'use_gpu': False,
+    'max_epochs': 300,
+    'use_gpu': True,
     'early_stopping_patience':  10,
     'check_val_every_n_epoch': 5
 }
@@ -150,66 +140,37 @@ setup_anndata_kwargs = {
 
 # Initialize and setup the CPA model with AnnData
 model = cpa.CPA
+os.environ ["CUDA_VISIBLE_DEVICES"]="0"
 model.setup_anndata(adata, **setup_anndata_kwargs)
 
 # Run the hyperparameter tuning experiment
-EXPERIMENT_NAME = "cpa_autotune_norman_2"
+EXPERIMENT_NAME = "cpa_autotune_norman_newest"
 CHECKPOINT_DIR  = os.path.join(LOGGING_DIR, EXPERIMENT_NAME)
-
-resume_experiment = os.path.exists(CHECKPOINT_DIR)
-if resume_experiment:
-    print(f"Resuming experiment from {CHECKPOINT_DIR}")
-    # Load the existing experiment to get the tuner and resume
-    from ray.tune import Tuner
-
-    tuner = Tuner.restore(CHECKPOINT_DIR, trainable=None)  # trainable will be re-inferred
-    result_grid = tuner.fit()
-    experiment = AutotuneExperiment(
-        model_cls=model,
-        data=adata,
-        metrics=["cpa_metric", "r2_mean_deg", "r2_var_deg", "r2_mean_lfc_deg", "r2_var_lfc_deg"],
-        mode="max",
-        search_space=search_space,
-        num_samples=200,
-        scheduler="asha",
-        searcher="hyperopt",
-        seed=1,
-        resources=resources,
-        name=EXPERIMENT_NAME,
-        logging_dir=LOGGING_DIR,
-        scheduler_kwargs=scheduler_kwargs,
-        adata_path=PREPROCESSED_DATA_PATH,
-        sub_sample=0.1,
-        setup_anndata_kwargs=setup_anndata_kwargs,
-        plan_kwargs_keys=plan_kwargs_keys,
-    )
-    experiment.result_grid = result_grid
-else:
-    print(f"Starting new experiment at {CHECKPOINT_DIR}")
-    experiment = run_autotune(
+os.environ ["CUDA_VISIBLE_DEVICES"]="1"
+experiment = run_autotune(
         model_cls=model,
         data=adata,
         metrics=["cpa_metric", "disnt_basal", "disnt_after", "r2_mean", "val_r2_mean", "val_r2_var", "val_recon"],
         mode="max",  # Maximize the first metric (cpa_metric)
         search_space=search_space,
-        num_samples=500,  # Number of trials to run (adjust as needed)
+        num_samples=200,  # Number of trials to run (adjust as needed)
         scheduler="asha",
         searcher="hyperopt",
         seed=1,
-        resources={"cpu": 40,"gpu": 4,"memory": 170 * 1024 * 1024 * 1024},  # Adjust based on hardware
+        resources={"cpu": 8,"gpu": 1,"memory": 130 * 1024 * 1024 * 1024},  # Adjust based on hardware
         experiment_name=EXPERIMENT_NAME,
         logging_dir=LOGGING_DIR,  # Update to desired logging directory
         adata_path=PREPROCESSED_DATA_PATH,
-        sub_sample=0.1,
+        sub_sample=None,
         setup_anndata_kwargs=setup_anndata_kwargs,
-        use_wandb=False,
-        wandb_name="cpa_tune_norman",
+        use_wandb=True,
+        wandb_name="cpa_tune_norman_newest",
         scheduler_kwargs=scheduler_kwargs,
         plan_kwargs_keys=plan_kwargs_keys,
     )
 
 # Save the tuning results
 result_grid = experiment.result_grid
-result_file_path = os.path.join(LOGGING_DIR, 'result_grid_norman_2.pkl')
+result_file_path = os.path.join(LOGGING_DIR, 'result_grid_norman_newest.pkl')
 with open(result_file_path, 'wb') as f:
     pickle.dump(result_grid, f)

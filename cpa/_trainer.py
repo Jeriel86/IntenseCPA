@@ -17,8 +17,9 @@ class CPATrainRunner(SCVITrainRunner):
         num_gpus: Optional[int] = None,
         **trainer_kwargs,
     ):
-        if use_gpu :
-            num_gpus = torch.cuda.device_count()
+        print("Num GPUS: "+str(num_gpus))
+        print("use GPU"+str(use_gpu))
+        
         # Determine accelerator, devices, and strategy based on inputs
         if num_gpus is not None and isinstance(num_gpus, int) and num_gpus > 1:
             accelerator = "gpu"
@@ -59,13 +60,15 @@ class CPATrainRunner(SCVITrainRunner):
             **trainer_kwargs,
         )
         devices = trainer_kwargs.get("devices", 1)
+        print("Devices: " + str(devices))
+
         self.is_multi_gpu = (isinstance(devices, list) and len(devices) > 1) or \
                             (isinstance(devices, int) and devices > 1)
 
         # Set device attribute for compatibility (used in SCVITrainRunner.__call__)
         # For DDP, each process handles its own device, so this is a fallback
         self.device = torch.device("cuda:0") if accelerator == "gpu" and devices else torch.device("cpu")
-
+        print("Device: " + str(self.device))
     def __call__(self):
         if hasattr(self.data_splitter, "n_train"):
             self.training_plan.n_obs_training = self.data_splitter.n_train

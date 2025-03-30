@@ -166,7 +166,6 @@ model.train(
     early_stopping_patience=10 if args.use_intense else 5,
     check_val_every_n_epoch=5,
     save_path=save_path,
-    num_gpus=8 if args.use_intense else None
 )
 
 plot_path = os.path.join(save_path, "history.png")

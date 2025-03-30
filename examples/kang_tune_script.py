@@ -33,7 +33,7 @@ else:
 adata = sc.read_h5ad(PREPROCESSED_DATA_PATH)
 
 # Subsample the data
-sc.pp.subsample(adata, fraction=0.1)
+#sc.pp.subsample(adata, fraction=0.1)
 
 # Model hyperparameters for tuning
 model_args = {
@@ -57,7 +57,7 @@ model_args = {
     'valid_split': 'valid',
     'test_split': 'ood',
     'use_intense': True,
-    'intense_reg_rate': tune.choice([0.0, 0.001, 0.005, 0.01, 0.05, 0.1]),
+    'intense_reg_rate': tune.choice([0.001, 0.005, 0.01, 0.05, 0.1]),
     'intense_p': tune.choice([1, 2])
 }
 
@@ -93,7 +93,7 @@ plan_kwargs_keys = list(train_args.keys())
 
 # Trainer arguments
 trainer_actual_args = {
-    'max_epochs': 200,
+    'max_epochs': 300,
     'use_gpu': True,
     'early_stopping_patience':   10,
     'check_val_every_n_epoch': 5,
@@ -128,34 +128,35 @@ setup_anndata_kwargs = {
 
 # Setup AnnData with preprocessed data
 model = cpa.CPA
+os.environ ["CUDA_VISIBLE_DEVICES"]="0"
 model.setup_anndata(adata, **setup_anndata_kwargs)
-
-# Resources matching XEON_SP_4215 node with Tesla V100
+# Resources to allocate pro trial
 resources = {
-    "cpu": 40,
-    "gpu": 8,
-    "memory": 100 * 1024 * 1024 * 1024  # 183 GiB
+    "cpu": 16,
+    "gpu": 1,
+    "memory": 140 * 1024 * 1024 * 1024  # 183 GiB
 }
 
 # Run hyperparameter tuning
+os.environ ["CUDA_VISIBLE_DEVICES"]="1"
 experiment = run_autotune(
     model_cls=model,
     data=adata,
     metrics=["cpa_metric", "disnt_basal", "disnt_after", "r2_mean", "val_r2_mean", "val_r2_var", "val_recon"],
     mode="max",
     search_space=search_space,
-    num_samples=100,
+    num_samples=200,
     scheduler="asha",
     searcher="hyperopt",
     seed=1,
     resources=resources,
-    experiment_name="kang_autotune_2103_1",
+    experiment_name="kang_autotune_2703_3_newest",
     logging_dir=LOGGING_DIR,
     adata_path=PREPROCESSED_DATA_PATH,  # Use preprocessed data path
     sub_sample=None,
     setup_anndata_kwargs=setup_anndata_kwargs,
     use_wandb=True,
-    wandb_name="cpa_kang_tune_2103_1",
+    wandb_name="cpa_kang_tune_2703_newest",
     scheduler_kwargs=scheduler_kwargs,
     plan_kwargs_keys=plan_kwargs_keys,
 )

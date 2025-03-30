@@ -45,7 +45,7 @@ import scanpy as sc
 current_dir = "/home/nmbiedou/Documents/cpa"
 
 # Uncomment to set GPU visibility
-#os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 # Set Scanpy figure parameters
 sc.settings.set_figure_params(dpi=100)
@@ -54,7 +54,7 @@ sc.settings.set_figure_params(dpi=100)
 data_path = os.path.join(current_dir, "datasets", "kang_normalized_hvg.h5ad")
 
 # Define save path for the results(model, images, csv)
-save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_SGD_Optimized_2203')
+save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_2803')
 
 # --- Loading dataset ---
 
@@ -81,7 +81,7 @@ print(adata.obs['cell_type'].value_counts())
 print(adata.obs['condition'].value_counts())
 
 # Set up AnnData for CPA
-
+print("Setup Anndata")
 cpa.CPA.setup_anndata(
     adata,
     perturbation_key='condition',
@@ -93,56 +93,57 @@ cpa.CPA.setup_anndata(
     deg_uns_cat_key='cov_cond',
     max_comb_len=1,
 )
-
+print( "model params")
 # --- CPA Model Parameters ---
 model_params = {
-    "n_latent": 64,                    # Updated from model_args
-    "recon_loss": "nb",                # Updated from model_args
-    "doser_type": "linear",            # Updated from model_args
-    "n_hidden_encoder": 128,           # Updated from model_args
-    "n_layers_encoder": 2,             # Updated from model_args
-    "n_hidden_decoder": 512,           # Updated from model_args
-    "n_layers_decoder": 2,             # Updated from model_args
-    "use_batch_norm_encoder": True,    # Updated from model_args
-    "use_layer_norm_encoder": False,   # Updated from model_args
-    "use_batch_norm_decoder": False,   # Updated from model_args
-    "use_layer_norm_decoder": True,    # Updated from model_args
-    "dropout_rate_encoder": 0.0,       # Updated from model_args
-    "dropout_rate_decoder": 0.1,       # Updated from model_args
-    "variational": False,              # Updated from model_args
-    "seed": 6977,                      # Updated from model_args (6,977 interpreted as 6977)
-    "use_intense": True,               # Updated from model_args
-    "intense_reg_rate": 0.5,           # Updated from model_args
-    "intense_p": 2                     # Updated from model_args
+    "n_latent": 64,
+    "recon_loss": "nb",
+    "doser_type": "linear",
+    "n_hidden_encoder": 128,
+    "n_layers_encoder": 2,
+    "n_hidden_decoder": 512,
+    "n_layers_decoder": 2,
+    "use_batch_norm_encoder": True,
+    "use_layer_norm_encoder": False,
+    "use_batch_norm_decoder": False,
+    "use_layer_norm_decoder": True,
+    "dropout_rate_encoder": 0.0,
+    "dropout_rate_decoder": 0.1,
+    "variational": False,
+    "seed": 6977,
+    "use_intense": True,
+    "intense_reg_rate": 0.01,
+    "intense_p": 1
 }
 
 trainer_params = {
-    "n_epochs_adv_warmup": 1,          # Updated from model_args
-    "n_epochs_kl_warmup": None,        # Updated from model_args (null)
-    "n_epochs_pretrain_ae": 3,         # Updated from model_args
-    "adv_steps": 20,                   # Updated from model_args
-    "mixup_alpha": 0.5,                # Updated from model_args
-    "n_epochs_mixup_warmup": 1,        # Updated from model_args
-    "n_layers_adv": 2,                 # Updated from model_args
-    "n_hidden_adv": 128,               # Updated from model_args
-    "use_batch_norm_adv": True,        # Updated from model_args
-    "use_layer_norm_adv": False,       # Updated from model_args
-    "dropout_rate_adv": 0.3,           # Updated from model_args
-    "pen_adv": 0.06586477769085837,    # Updated from model_args
-    "reg_adv": 25.915240512217768,     # Updated from model_args
-    "lr": 0.00031846009054514735,      # Updated from model_args
-    "wd": 0.00000001297631322054,      # Updated from model_args
-    "doser_lr": 0.0011680586429996507, # Updated from model_args
-    "doser_wd": 0.00000250280215373454,# Updated from model_args
-    "adv_lr": 0.00001758762700595009,  # Updated from model_args
-    "adv_wd": 0.00000007470316045061,  # Updated from model_args
-    "adv_loss": "cce",                 # Updated from model_args
-    "do_clip_grad": False,             # Updated from model_args
-    "gradient_clip_value": 1,          # Updated from model_args
-    "step_size_lr": 45,                # Updated from model_args
+    "n_epochs_kl_warmup": None,
+    "n_epochs_pretrain_ae": 5,
+    "n_epochs_adv_warmup": 5,
+    "n_epochs_mixup_warmup": 5,
+    "mixup_alpha": 0.2,
+    "adv_steps": 3,
+    "n_hidden_adv": 128,
+    "n_layers_adv": 4,
+    "use_batch_norm_adv": False,
+    "use_layer_norm_adv": False,
+    "dropout_rate_adv": 0.3,
+    "reg_adv": 2.43828696766268,
+    "pen_adv": 4.1724722219803425,
+    "lr": 0.0001533493418490112,
+    "wd": 0.0000000791130083766,
+    "adv_lr": 0.0005984734868477526,
+    "adv_wd": 0.00000001201376573356,
+    "adv_loss": "cce",
+    "doser_lr": 0.0003331089782353292,
+    "doser_wd": 0.00000082009742906479,
+    "do_clip_grad": False,
+    "gradient_clip_value": 1.0,
+    "step_size_lr": 25,
+    "momentum": 0,
 }
 # --- Creating CPA Model ---
-
+print("model build....")
 # Exclude B cells treated with IFN-beta from training (OOD set)
 model = cpa.CPA(
     adata=adata,
@@ -154,7 +155,7 @@ model = cpa.CPA(
 )
 
 # --- Training CPA ---
-
+print("Start training")
 model.train(
     max_epochs=2000,
     use_gpu=True,  # Set to True if GPU is available
@@ -162,8 +163,7 @@ model.train(
     plan_kwargs=trainer_params,
     early_stopping_patience=10,
     check_val_every_n_epoch=5,
-    save_path=save_path,
-    num_gpus=8
+    save_path=save_path
 )
 
 plot_path = os.path.join(save_path, "history.png")
@@ -171,11 +171,11 @@ plot_path = os.path.join(save_path, "history.png")
 cpa.pl.plot_history(model,plot_path)
 
 # --- Restore Best Model (Optional) ---
-# model = cpa.CPA.load(
-#     dir_path=os.path.join(current_dir, 'lightning_logs', 'Kang'),
-#     adata=adata,
-#     use_gpu=False
-# )
+"""model = cpa.CPA.load(
+     dir_path=os.path.join(current_dir, 'lightning_logs', 'Kang'),
+     adata=adata,
+     use_gpu=False
+ )"""
 
 # --- Latent Space Visualization ---
 
@@ -191,12 +191,12 @@ sc.pl.umap(
     color=['condition', 'cell_type'],
     frameon=False,
     wspace=0.3,
-    save='latent_basal_2203_2.png'  # Saves the plot as a file
+    save='latent_basal.png'  # Saves the plot as a file
 )
 
 os.rename(
-    os.path.join(sc.settings.figdir, f'umaplatent_basal_2203_2.png'),
-    os.path.join(save_path, f'latent_basal_2203_2.png')
+    os.path.join(sc.settings.figdir, f'umaplatent_basal.png'),
+    os.path.join(save_path, f'latent_basal.png')
 )
 
 
@@ -208,11 +208,11 @@ sc.pl.umap(
     color=['condition', 'cell_type'],
     frameon=False,
     wspace=0.3,
-    save='latent_after_2203_22.png'  # Saves the plot as a file
+    save='latent_after.png'  # Saves the plot as a file
 )
 os.rename(
-    os.path.join(sc.settings.figdir, f'umaplatent_after_2203_2.png'),
-    os.path.join(save_path, f'latent_after_2.png')
+    os.path.join(sc.settings.figdir, f'umaplatent_after.png'),
+    os.path.join(save_path, f'latent_after.png')
 )
 # --- Evaluation ---
 

@@ -26,6 +26,7 @@ class CPATrainingPlan(TrainingPlan):
             n_adv_perts: int,
             lr=5e-4,
             wd=1e-6,
+            momentum: float = 0,
             n_steps_pretrain_ae: Optional[int] = None,
             n_epochs_pretrain_ae: Optional[int] = None,
             n_steps_kl_warmup: Optional[int] = None,
@@ -120,6 +121,8 @@ class CPATrainingPlan(TrainingPlan):
             Weights for the perturbations to be used in the adversarial loss.
         adv_loss: Optional[str]
             Adversarial loss to be used. Can be either 'cce' or 'focal'.
+        momentum: float
+            momentum used in the SGD optimizer of the ae
         """
         super().__init__(
             module=module,
@@ -167,6 +170,7 @@ class CPATrainingPlan(TrainingPlan):
 
         self.do_clip_grad = do_clip_grad
         self.gradient_clip_value = gradient_clip_value
+        self.momentum = momentum
 
         if module.use_intense:
             self.metrics = ['recon_loss', 'KL',
@@ -385,7 +389,7 @@ class CPATrainingPlan(TrainingPlan):
                 {"params": ae_params, "weight_decay": self.wd},  # normal AE stuff
                 {"params": intense_params, "weight_decay": 0.0},  # no WD for InTense
             ]
-            optimizer_autoencoder = torch.optim.SGD(ae_params,lr=self.lr)
+            optimizer_autoencoder = torch.optim.SGD(ae_params, lr=self.lr, momentum=self.momentum)
         else:
             optimizer_autoencoder = torch.optim.Adam(
                 ae_params,

@@ -7,20 +7,6 @@ from sklearn.metrics import r2_score
 from collections import defaultdict
 from tqdm import tqdm
 
-# Check if running in Google Colab
-IN_COLAB = "google.colab" in sys.modules
-branch = "latest"
-
-# Install dependencies if in Colab
-if IN_COLAB and branch == "stable":
-    os.system("pip install cpa-tools")
-    os.system("pip install scanpy")
-elif IN_COLAB and branch != "stable":
-    os.system("pip install --quiet --upgrade jsonschema")
-    os.system("pip install git+https://github.com/theislab/cpa")
-    os.system("pip install scanpy")
-
-# Import CPA and Scanpy
 import cpa
 import scanpy as sc
 
@@ -82,17 +68,17 @@ def run_experiment(seed, intense_reg_rate=None, intense_p=None, use_intense=Fals
         model_params = {
             "n_latent": 64,
             "recon_loss": "nb",
-            "doser_type": "logsigm",
-            "n_hidden_encoder": 512,
-            "n_layers_encoder": 5,
-            "n_hidden_decoder": 256,
+            "doser_type": "linear",
+            "n_hidden_encoder": 128,
+            "n_layers_encoder": 2,
+            "n_hidden_decoder": 512,
             "n_layers_decoder": 2,
-            "use_batch_norm_encoder": False,
-            "use_layer_norm_encoder": True,
-            "use_batch_norm_decoder": True,
-            "use_layer_norm_decoder": False,
-            "dropout_rate_encoder": 0.2,
-            "dropout_rate_decoder": 0.0,
+            "use_batch_norm_encoder": True,
+            "use_layer_norm_encoder": False,
+            "use_batch_norm_decoder": False,
+            "use_layer_norm_decoder": True,
+            "dropout_rate_encoder": 0.0,
+            "dropout_rate_decoder": 0.1,
             "variational": False,
             "seed": seed,
             "use_intense": True,
@@ -100,29 +86,29 @@ def run_experiment(seed, intense_reg_rate=None, intense_p=None, use_intense=Fals
             "intense_p": intense_p
         }
         trainer_params = {
-            "n_epochs_adv_warmup": 3,
             "n_epochs_kl_warmup": None,
-            "n_epochs_pretrain_ae": 50,
-            "adv_steps": 5,
-            "mixup_alpha": 0.3,
-            "n_epochs_mixup_warmup": 10,
-            "n_layers_adv": 2,
-            "n_hidden_adv": 64,
+            "n_epochs_pretrain_ae": 5,
+            "n_epochs_adv_warmup": 5,
+            "n_epochs_mixup_warmup": 5,
+            "mixup_alpha": 0.2,
+            "adv_steps": 3,
+            "n_hidden_adv": 128,
+            "n_layers_adv": 4,
             "use_batch_norm_adv": False,
             "use_layer_norm_adv": False,
-            "dropout_rate_adv": 0.0,
-            "pen_adv": 0.1995431254447313,
-            "reg_adv": 6.1902932390831324,
-            "lr": 0.0007064775779032066,
-            "wd": 1.175555699588592e-07,
-            "doser_lr": 2.3211621010467742e-05,
-            "doser_wd": 1.2484610680888827e-07,
-            "adv_lr": 0.003224233031630511,
-            "adv_wd": 1.6809347701585555e-08,
+            "dropout_rate_adv": 0.3,
+            "reg_adv": 2.43828696766268,
+            "pen_adv": 4.1724722219803425,
+            "lr": 0.0001533493418490112,
+            "wd": 0.0000000791130083766,
+            "adv_lr": 0.0005984734868477526,
+            "adv_wd": 0.00000001201376573356,
             "adv_loss": "cce",
+            "doser_lr": 0.0003331089782353292,
+            "doser_wd": 0.00000082009742906479,
             "do_clip_grad": False,
             "gradient_clip_value": 1.0,
-            "step_size_lr": 10,
+            "step_size_lr": 25,
         }
     else:
         model_params = {
@@ -182,13 +168,12 @@ def run_experiment(seed, intense_reg_rate=None, intense_p=None, use_intense=Fals
     # --- Training CPA ---
     model.train(
         max_epochs=2000,
-        use_gpu=False,
+        use_gpu=True,
         batch_size=512,
         plan_kwargs=trainer_params,
-        early_stopping_patience=15 if use_intense else 5,
+        early_stopping_patience=10 if use_intense else 5,
         check_val_every_n_epoch=5,
-        save_path=save_path,
-        num_gpus=5
+        save_path=save_path
     )
 
     plot_path = os.path.join(save_path, "history.png")
@@ -286,7 +271,7 @@ results_dir = os.path.join(current_dir, 'lightning_logs', 'experiment_results')
 os.makedirs(results_dir, exist_ok=True)
 if __name__ == "__main__":
     # 1. Run original CPA (without intense)
-    """all_dfs_original = []
+    all_dfs_original = []
     for seed in seeds:
         df = run_experiment(seed, use_intense=False)
         all_dfs_original.append(df)
@@ -296,7 +281,7 @@ if __name__ == "__main__":
     avg_df_original = combined_df_original.groupby(['condition', 'cell_type', 'n_top_deg']).mean().reset_index()
     result_file_original = os.path.join(results_dir, 'result_experiment_original.csv')
     avg_df_original.to_csv(result_file_original, index=False)
-    print(f"Saved averaged results for original CPA to {result_file_original}")"""
+    print(f"Saved averaged results for original CPA to {result_file_original}")
 
     # 2. Run CPA with intense for each parameter combination
     for intense_reg_rate in intense_reg_rates:

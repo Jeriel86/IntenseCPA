@@ -11,7 +11,7 @@ import gdown
 PROJECT_ROOT = "/home/nmbiedou/Documents/cpa"
 ORIGINAL_DATA_PATH = os.path.join(PROJECT_ROOT, "datasets", "combo_sciplex_prep_hvg_filtered.h5ad")
 PREPROCESSED_DATA_PATH = os.path.join(PROJECT_ROOT, "datasets", "combo_sciplex_prep_hvg_filtered_preprocessed.h5ad")
-LOGGING_DIR = os.path.join(PROJECT_ROOT, "Combo_autotune")
+LOGGING_DIR = os.getenv("LOGGING_DIR", "/scratch/nmbiedou/autotune")
 
 
 os.makedirs(LOGGING_DIR, exist_ok=True)
@@ -35,33 +35,32 @@ else:
 adata = sc.read_h5ad(PREPROCESSED_DATA_PATH)
 
 # Subsample the data
-sc.pp.subsample(adata, fraction=0.1)
+#sc.pp.subsample(adata, fraction=0.1)
 
 # Model hyperparameters for tuning (adapted from combo-sciplex example)
 model_args = {
-    'n_latent': tune.choice([32, 64, 128, 256]),
-    'recon_loss': tune.choice(['nb']),
-    'doser_type': tune.choice(['logsigm']),
-    'n_hidden_encoder': tune.choice([128, 256, 512, 1024]),
-    'n_layers_encoder': tune.choice([1, 2, 3, 4, 5]),
-    'n_hidden_decoder': tune.choice([128, 256, 512, 1024]),
-    'n_layers_decoder': tune.choice([1, 2, 3, 4, 5]),
-    'use_batch_norm_encoder': tune.choice([True, False]),
-    'use_layer_norm_encoder': tune.sample_from(
-        lambda spec: False if spec.config.model_args.use_batch_norm_encoder else np.random.choice([True, False])),
-    'use_batch_norm_decoder': tune.choice([True, False]),
-    'use_layer_norm_decoder': tune.sample_from(
-        lambda spec: False if spec.config.model_args.use_batch_norm_decoder else np.random.choice([True, False])),
-    'dropout_rate_encoder': tune.choice([0.0, 0.1, 0.2, 0.25]),
-    'dropout_rate_decoder': tune.choice([0.0, 0.1, 0.2, 0.25]),
-    'variational': tune.choice([False]),
-    'seed': tune.randint(0, 10000),
+    "n_latent": 128,
+    "recon_loss": "nb",
+    "doser_type": "logsigm",
+    "n_hidden_encoder": 512,
+    "n_layers_encoder": 3,
+    "n_hidden_decoder": 512,
+    "n_layers_decoder": 3,
+    "use_batch_norm_encoder": True,
+    "use_layer_norm_encoder": False,
+    "use_batch_norm_decoder": True,
+    "use_layer_norm_decoder": False,
+    "dropout_rate_encoder": 0.1,
+    "dropout_rate_decoder": 0.1,
+    "variational": False,
+    "seed": 434,
     'split_key': 'split_1ct_MEC',
     'train_split': 'train',
     'valid_split': 'valid',
     'test_split': 'ood',
     'use_intense': True,
-    'intense_reg_rate': tune.choice([0.01, 0.05, 0.1]),
+    'intense_reg_rate': tune.choice([0.001, 0.005, 0.01, 0.05, 0.1]),
+    'intense_p': tune.choice([1, 2])
 }
 
 # Training hyperparameters for tuning (adapted from combo-sciplex example)
@@ -96,11 +95,10 @@ plan_kwargs_keys = list(train_args.keys())
 
 # Trainer arguments
 trainer_actual_args = {
-    'max_epochs': 200,
+    'max_epochs': 300,
     'use_gpu': True,
     'early_stopping_patience': 10,
-    'check_val_every_n_epoch': 5,
-    'batch_size': 128,
+    'check_val_every_n_epoch': 5
 }
 train_args.update(trainer_actual_args)
 
@@ -136,46 +134,16 @@ model.setup_anndata(adata, **setup_anndata_kwargs)
 
 # Resources for training
 resources = {
-    "cpu": 40,
-    "gpu":4,
-    "memory": 170 * 1024 * 1024 * 1024  # 183 GiB
+    "cpu": 8,
+    "gpu":1,
+    "memory": 130 * 1024 * 1024 * 1024  # 183 GiB
 }
 
 # Run hyperparameter tuning
 EXPERIMENT_NAME = "cpa_autotune_combo"
 CHECKPOINT_DIR  = os.path.join(LOGGING_DIR, EXPERIMENT_NAME)
 
-resume_experiment = os.path.exists(CHECKPOINT_DIR)
-if resume_experiment:
-    print(f"Resuming experiment from {CHECKPOINT_DIR}")
-    # Load the existing experiment to get the tuner and resume
-    from ray.tune import Tuner
-
-    tuner = Tuner.restore(CHECKPOINT_DIR, trainable=None)  # trainable will be re-inferred
-    result_grid = tuner.fit()
-    experiment = AutotuneExperiment(
-        model_cls=model,
-        data=adata,
-        metrics=["cpa_metric", "r2_mean_deg", "r2_var_deg", "r2_mean_lfc_deg", "r2_var_lfc_deg"],
-        mode="max",
-        search_space=search_space,
-        num_samples=200,
-        scheduler="asha",
-        searcher="hyperopt",
-        seed=1,
-        resources=resources,
-        name=EXPERIMENT_NAME,
-        logging_dir=LOGGING_DIR,
-        scheduler_kwargs=scheduler_kwargs,
-        adata_path=PREPROCESSED_DATA_PATH,
-        sub_sample=0.1,
-        setup_anndata_kwargs=setup_anndata_kwargs,
-        plan_kwargs_keys=plan_kwargs_keys,
-    )
-    experiment.result_grid = result_grid
-else:
-    print(f"Starting new experiment at {CHECKPOINT_DIR}")
-    experiment = run_autotune(
+experiment = run_autotune(
         model_cls=model,
         data=adata,
         metrics=["cpa_metric", "r2_mean_deg", "r2_var_deg", "r2_mean_lfc_deg", "r2_var_lfc_deg"],
@@ -189,9 +157,9 @@ else:
         experiment_name=EXPERIMENT_NAME,
         logging_dir=LOGGING_DIR,
         adata_path=PREPROCESSED_DATA_PATH,
-        sub_sample=0.1,
+        sub_sample=None,
         setup_anndata_kwargs=setup_anndata_kwargs,
-        use_wandb=False,
+        use_wandb=True,
         wandb_name="cpa_tune_combo",
         scheduler_kwargs=scheduler_kwargs,
         plan_kwargs_keys=plan_kwargs_keys,

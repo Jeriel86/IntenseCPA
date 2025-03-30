@@ -14,7 +14,7 @@ class AnnDataSplitter(DataSplitter):
             valid_indices,
             test_indices,
             use_gpu: bool = False,
-            num_workers: int = 0,
+            num_workers: int = 4,
             **kwargs,
     ):
         super().__init__(adata_manager)
