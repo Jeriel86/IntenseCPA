@@ -451,7 +451,7 @@ class CPA(BaseModelClass):
         use_gpu: Optional[Union[str, int, bool]] = None,
         train_size: float = 0.9,
         validation_size: Optional[float] = None,
-        batch_size: int = 2048,
+        batch_size: Optional[int] = None,
         plan_kwargs: Optional[dict] = None,
         save_path: Optional[str] = None,
         check_val_every_n_epoch: int = 10,
@@ -492,6 +492,9 @@ class CPA(BaseModelClass):
             n_cells = self.adata.n_obs
             max_epochs = np.min([round((20000 / n_cells) * 400), 400])
         plan_kwargs = plan_kwargs if isinstance(plan_kwargs, dict) else dict()
+        if batch_size is None:
+            batch_size = plan_kwargs["batch_size"]
+            print("Batch size is : " + str(batch_size))
 
         manual_splitting = (
             (self.valid_indices is not None)

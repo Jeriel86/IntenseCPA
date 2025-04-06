@@ -9,7 +9,6 @@ from ._normalization_module import VectorWiseBatchNorm, Normalize3
 class MKLFusion(nn.Module):
     def __init__(
             self,
-            # in_tensors: int,
             in_features: dict[str, int],
             out_features: int,
             bias: bool = True,
@@ -18,15 +17,13 @@ class MKLFusion(nn.Module):
     ):
         """Initialize the MKLFusion module
         Args:
-            in_features(list[int]): Each element of the list is the dimension of a
-                                    modality's feature-representation, which is an input to
-                                    the final fusion layer
-            out_features(int): Final output which depends on the number if classes
-                                in the dataset
-        Returns:
-            A nn.Module to fuse the mdalities
+            in_features(dict[str, int]): A dictionary where keys are the modality keys and
+                                          values are their respective feature dimensions.
+            out_features(int): Final output dimension (e.g., number of classes).
+            bias(bool): Whether to use a bias in the fusion layer.
+            reg_rate(float): Regularization rate.
+            intense_p(int): Hyperparameter p used for the intensity regularization.
         """
-        # TODO: add an option to pass the hyperparameter p here
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -37,7 +34,6 @@ class MKLFusion(nn.Module):
         )
         self.reg_rate = reg_rate
         self.p = intense_p
-
 
     @property
     def bias(self):
@@ -94,18 +90,16 @@ class TensorFusionModel(nn.Module):
         elif len(inp) == 4:
             return torch.einsum("bi,bj,bk,bl->bijkl", inp)
         else:
-            raise ValueError('Tensor product is only supported for 2 to 4\
-                 batch vectors.')
-
+            raise ValueError('Tensor product is only supported for 2 to 4 batch vectors.')
 
 
 class InTense(nn.Module):
     """
-    Full pipeline:
-      - BN singles
-      - BN pairs
-      - triple normalization
-      - fuse all (singles + pairs + triple) with MKLFusion
+    Full pipeline with configurable interaction order:
+      - BN on single embeddings (order 1)
+      - Optionally, pairwise interactions (order 2)
+      - Optionally, triple interaction (order 3)
+      - Fuse all selected representations with MKLFusion
     """
 
     def __init__(
@@ -115,9 +109,24 @@ class InTense(nn.Module):
         track_running_stats: bool = True,
         out_features: int = 1,
         intense_reg_rate: float = 0.01,
-        intense_p: int = 1
+        intense_p: int = 1,
+        interaction_order: int = 3  # 1: singles, 2: singles + pairs, 3: singles + pairs + triple
     ):
+        """
+        Args:
+            dim_dict_single(dict[str, int]): Dictionary with dimensions of single-modality features.
+            feature_dim_dict_triple(dict[str, int]): Dictionary with dimensions for pairwise and triple interactions.
+            track_running_stats(bool): Whether BN modules track running stats.
+            out_features(int): Output dimension.
+            intense_reg_rate(float): Regularization rate for MKLFusion.
+            intense_p(int): Hyperparameter p for MKLFusion.
+            interaction_order(int): Interaction order to use (1, 2, or 3).
+        """
         super().__init__()
+
+        if interaction_order not in [1, 2, 3]:
+            raise ValueError("interaction_order must be 1, 2, or 3")
+        self.interaction_order = interaction_order
 
         # (A) BN on single embeddings
         self.bn_single = nn.ModuleDict({
@@ -128,95 +137,98 @@ class InTense(nn.Module):
             for mod_idx in ["1", "2", "3"]
         })
 
-        # (B) Models for pairwise & triple
-        self.tf_12 = TensorFusionModel(["1", "2"])
-        self.tf_13 = TensorFusionModel(["1", "3"])
-        self.tf_23 = TensorFusionModel(["2", "3"])
-        self.tf_123 = TensorFusionModel(["1", "2", "3"])
+        # (B) Models for pairwise interactions (if order >=2)
+        if self.interaction_order >= 2:
+            self.tf_12 = TensorFusionModel(["1", "2"])
+            self.tf_13 = TensorFusionModel(["1", "3"])
+            self.tf_23 = TensorFusionModel(["2", "3"])
+            # (C) BN on each pairwise product
+            self.bn_pair = nn.ModuleDict({
+                "12": VectorWiseBatchNorm(
+                    num_features=feature_dim_dict_triple["12"],
+                    track_running_stats=track_running_stats
+                ),
+                "13": VectorWiseBatchNorm(
+                    num_features=feature_dim_dict_triple["13"],
+                    track_running_stats=track_running_stats
+                ),
+                "23": VectorWiseBatchNorm(
+                    num_features=feature_dim_dict_triple["23"],
+                    track_running_stats=track_running_stats
+                ),
+            })
 
-        # (C) BN on each pairwise product
-        self.bn_pair = nn.ModuleDict({
-            "12": VectorWiseBatchNorm(
-                num_features=feature_dim_dict_triple["12"],
-                track_running_stats=track_running_stats
-            ),
-            "13": VectorWiseBatchNorm(
-                num_features=feature_dim_dict_triple["13"],
-                track_running_stats=track_running_stats
-            ),
-            "23": VectorWiseBatchNorm(
-                num_features=feature_dim_dict_triple["23"],
-                track_running_stats=track_running_stats
-            ),
-        })
+        # (D) Triple product & normalization (if order == 3)
+        if self.interaction_order == 3:
+            self.tf_123 = TensorFusionModel(["1", "2", "3"])
+            self.normalize_triple = Normalize3(
+                feature_dim_dict=feature_dim_dict_triple,
+                track_running_stats=track_running_stats,
+                mod_index="123"
+            )
 
-        # (D) Normalization for triple
-        self.normalize_triple = Normalize3(
-            feature_dim_dict=feature_dim_dict_triple,
-            track_running_stats=track_running_stats,
-            mod_index="123"
-        )
-
-        # (E) Finally, an MKLFusion layer to fuse ALL representations:
-        #     We'll give it a dictionary of in_features,
-        #     summing = z1_dim + z2_dim + z3_dim + z12_dim + z13_dim + z23_dim + z123_dim
+        # (E) Build in_features for MKLFusion based on interaction order
         in_feats = {
             "z1":  dim_dict_single["1"],
             "z2":  dim_dict_single["2"],
             "z3":  dim_dict_single["3"],
-            "z12": feature_dim_dict_triple["12"],
-            "z13": feature_dim_dict_triple["13"],
-            "z23": feature_dim_dict_triple["23"],
-            "z123": feature_dim_dict_triple["123"],
         }
+        if self.interaction_order >= 2:
+            in_feats["z12"] = feature_dim_dict_triple["12"]
+            in_feats["z13"] = feature_dim_dict_triple["13"]
+            in_feats["z23"] = feature_dim_dict_triple["23"]
+        if self.interaction_order == 3:
+            in_feats["z123"] = feature_dim_dict_triple["123"]
+
         self.intense_reg_rate = intense_reg_rate
         self.mkl_fusion = MKLFusion(
             in_features=in_feats,
             out_features=out_features,
             bias=True,
             reg_rate=intense_reg_rate,
-            intense_p= intense_p
+            intense_p=intense_p
         )
 
     def forward(self, z_dict: dict[str, torch.Tensor]) -> torch.Tensor:
         """
-        z_dict = {
-          "1": [B, dim1], "2": [B, dim2], "3": [B, dim3]
-        }
+        Args:
+            z_dict (dict[str, torch.Tensor]): Dictionary with keys "1", "2", "3"
+              representing individual modality embeddings.
         Returns:
-          final_out: [B, out_features], e.g. classification logits or regression output
+            final_out: [B, out_features], e.g., classification logits or regression output.
         """
 
         # 1) BN on single embeddings
         z1 = self.bn_single["1"](z_dict["1"])
         z2 = self.bn_single["2"](z_dict["2"])
         z3 = self.bn_single["3"](z_dict["3"])
-
-        # pack them
         z_dict_norm = {"1": z1, "2": z2, "3": z3}
 
-        # 2) Pairwise + BN
-        z12 = self.tf_12(z_dict_norm)  # shape [B, dim12]
-        z13 = self.tf_13(z_dict_norm)
-        z23 = self.tf_23(z_dict_norm)
+        tensor_list = [z1, z2, z3]  # always include singles
 
-        z12 = self.bn_pair["12"](z12)
-        z13 = self.bn_pair["13"](z13)
-        z23 = self.bn_pair["23"](z23)
+        # 2) Pairwise interactions if specified (interaction_order >=2)
+        if self.interaction_order >= 2:
+            z12 = self.tf_12(z_dict_norm)
+            z13 = self.tf_13(z_dict_norm)
+            z23 = self.tf_23(z_dict_norm)
 
-        # 3) Triple product + specialized BN
-        z123 = self.tf_123(z_dict_norm)
-        input_dict = {"12": z12, "13": z13, "23": z23, "123": z123}
-        pre_fusion_dict = {"1": z1, "2": z2, "3": z3}
-        z123_norm = self.normalize_triple(input_dict, pre_fusion_dict)
+            z12 = self.bn_pair["12"](z12)
+            z13 = self.bn_pair["13"](z13)
+            z23 = self.bn_pair["23"](z23)
 
-        # 4) Pass everything to MKLFusion
-        #    combine singles, pairs, triple, e.g.:
-        all_tensors = [z1, z2, z3, z12, z13, z23, z123_norm]
+            tensor_list.extend([z12, z13, z23])
 
-        final_out = self.mkl_fusion(all_tensors)  # shape [B, out_features]
-        #print(self.get_relevance_score())
+        # 3) Triple interaction if specified (interaction_order ==3)
+        if self.interaction_order == 3:
+            z123 = self.tf_123(z_dict_norm)
+            # The triple normalization can use the already computed pairwise outputs
+            input_dict = {"12": z12, "13": z13, "23": z23, "123": z123}
+            pre_fusion_dict = {"1": z1, "2": z2, "3": z3}
+            z123_norm = self.normalize_triple(input_dict, pre_fusion_dict)
+            tensor_list.append(z123_norm)
 
+        # 4) Fuse all selected representations
+        final_out = self.mkl_fusion(tensor_list)
         return final_out
 
     def get_regularizer(self):

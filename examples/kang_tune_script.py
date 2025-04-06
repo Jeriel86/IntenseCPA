@@ -57,7 +57,9 @@ model_args = {
     'valid_split': 'valid',
     'test_split': 'ood',
     'use_intense': True,
-    'intense_reg_rate': tune.choice([0.001, 0.005, 0.01, 0.05, 0.1]),
+    "use_rite": True,
+    "interaction_order": 2,
+    'intense_reg_rate': tune.choice([0.0, 0.001, 0.005, 0.01, 0.05, 0.1]),
     'intense_p': tune.choice([1, 2])
 }
 
@@ -88,15 +90,17 @@ train_args = {
     'do_clip_grad': tune.choice([True, False]),
     'gradient_clip_value': tune.choice([1.0]),
     'step_size_lr': tune.choice([10, 25, 45]),
+    'momentum': tune.uniform(0.0, 0.99),
 }
 plan_kwargs_keys = list(train_args.keys())
 
 # Trainer arguments
 trainer_actual_args = {
-    'max_epochs': 300,
+    'max_epochs': 2000,
     'use_gpu': True,
-    'early_stopping_patience':   10,
     'check_val_every_n_epoch': 5,
+    'batch_size': 512,
+    'early_stopping_patience': 10,
 }
 train_args.update(trainer_actual_args)
 
@@ -109,7 +113,7 @@ search_space = {
 # Scheduler settings for ASHA
 scheduler_kwargs = {
     'max_t': 1000,
-    'grace_period': 5,
+    'grace_period': 10,
     'reduction_factor': 4,
 }
 
@@ -132,31 +136,31 @@ os.environ ["CUDA_VISIBLE_DEVICES"]="0"
 model.setup_anndata(adata, **setup_anndata_kwargs)
 # Resources to allocate pro trial
 resources = {
-    "cpu": 16,
-    "gpu": 1,
-    "memory": 140 * 1024 * 1024 * 1024  # 183 GiB
+    "cpu": 8,
+    "gpu": 2,
+    "memory": 80 * 1024 * 1024 * 1024  # 183 GiB
 }
 
 # Run hyperparameter tuning
-os.environ ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ ["CUDA_VISIBLE_DEVICES"]="0,1,2,3,4,5,6,7"
 experiment = run_autotune(
     model_cls=model,
     data=adata,
     metrics=["cpa_metric", "disnt_basal", "disnt_after", "r2_mean", "val_r2_mean", "val_r2_var", "val_recon"],
     mode="max",
     search_space=search_space,
-    num_samples=200,
+    num_samples=300,
     scheduler="asha",
     searcher="hyperopt",
     seed=1,
     resources=resources,
-    experiment_name="kang_autotune_2703_3_newest",
+    experiment_name="kang_autotune_0604_rite_2",
     logging_dir=LOGGING_DIR,
     adata_path=PREPROCESSED_DATA_PATH,  # Use preprocessed data path
     sub_sample=None,
     setup_anndata_kwargs=setup_anndata_kwargs,
     use_wandb=True,
-    wandb_name="cpa_kang_tune_2703_newest",
+    wandb_name="cpa_kang_tune_0604_rite_2",
     scheduler_kwargs=scheduler_kwargs,
     plan_kwargs_keys=plan_kwargs_keys,
 )

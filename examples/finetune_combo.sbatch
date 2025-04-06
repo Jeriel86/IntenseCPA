@@ -1,13 +1,12 @@
 #!/bin/bash
-#SBATCH --mem=50G              # Memory: 128 GB
-#SBATCH -J Kang_finetune        # Job name
-#SBATCH --mail-type=END,FAIL    # Email notifications
+#SBATCH --mem=130G              # Memory: 128 GB
+#SBATCH -J Combo_finetune        # Job name
+#SBATCH --mail-type=BEGIN,END,FAIL    # Email notifications
 #SBATCH -n 1                    # 1 task
-#SBATCH --cpus-per-task=1       # 8 CPU cores per task
+#SBATCH --cpus-per-task=8       # 8 CPU cores per task
 #SBATCH -N 1                    # 1 node
-#SBATCH --gpus=A100:1           # 8 Tesla V100 GPUs
+#SBATCH --gres=gpu:a30:2           # 2 Tesla a100 GPUs
 #SBATCH --partition=gpuidle     # Target gpuidle partition
-#SBATCH --nodelist=gpu002
 #SBATCH --output=/home/nmbiedou/Documents/cpa/examples/slurm_%j.out  # Output log
 #SBATCH --error=/home/nmbiedou/Documents/cpa/examples/slurm_%j.err   # Error log
 
@@ -21,17 +20,9 @@ conda activate newcpa  # Replace with your actual environment name
 
 # Run the hyperparameter tuning script
 echo "Running hyperparameter tuning..."
-srun python /home/nmbiedou/Documents/cpa/examples/kang_tune_script.py
+srun python /home/nmbiedou/Documents/cpa/examples/combo_tune_script.py
 if [ $? -ne 0 ]; then
     echo "Error: Hyperparameter tuning script failed."
-    exit 1
-fi
-
-# Run the analysis script immediately after
-echo "Extracting best configuration and results..."
-python /home/nmbiedou/Documents/cpa/test.py --experiment kang
-if [ $? -ne 0 ]; then
-    echo "Error: Analysis script failed."
     exit 1
 fi
 

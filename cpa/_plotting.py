@@ -18,6 +18,7 @@ from . import CPA
 from ._api import ComPertAPI
 
 from typing import Optional
+import math
 
 FONT_SIZE = 13
 font = {'size': FONT_SIZE, 'family': 'monospace'}
@@ -1278,54 +1279,62 @@ def plot_r2_matrix(adata,
 
 def plot_history(model: CPA, save_path: Optional[str] = None):
     df = model.epoch_history
-    n_metrics = len(df.columns) - 2
 
-    # Calculate layout: put up to 3 plots per row, adjust rows accordingly
-    plots_per_row = 3
-    n_rows = (n_metrics + plots_per_row - 1) // plots_per_row  # Ceiling division
-    fig, ax = plt.subplots(n_rows,
-                           min(n_metrics, plots_per_row),
-                           sharex=True,
-                           sharey=False,
-                           figsize=(24, 2. * n_rows))  # Adjust height based on rows
+    # Gather all columns except epoch/mode
+    metric_columns = [c for c in df.columns if c not in ['epoch', 'mode']]
+    if not metric_columns:
+        print("No metrics to plot.")
+        return
 
-    # Convert ax to 2D array if multiple rows, or keep as 1D if single row
-    if n_rows == 1:
-        ax = ax.reshape(1, -1)
-    else:
-        ax = ax.reshape(n_rows, min(n_metrics, plots_per_row))
+    # Reorder so that relevance columns come last
+    regular_cols = [c for c in metric_columns if not c.startswith("relevance")]
+    relev_cols = [c for c in metric_columns if c.startswith("relevance")]
+    ordered_cols = regular_cols + relev_cols
+    n_metrics = len(ordered_cols)
+
+    # Compute a near-square layout
+    n_cols = int(math.ceil(math.sqrt(n_metrics)))
+    n_rows = int(math.ceil(n_metrics / n_cols))
+
+    # Set up subplots
+    fig, axes = plt.subplots(
+        n_rows, n_cols,
+        figsize=(5 * n_cols, 4 * n_rows),
+        sharex=True,
+        sharey=False
+    )
+    # Flatten to a list for consistent indexing
+    axes = axes.flatten() if isinstance(axes, (list, np.ndarray)) else [axes]
+
+    # Split train/valid for easy plotting
+    train_df = df[df['mode'] == 'train']
+    valid_df = df[df['mode'] == 'valid']
 
     # Plot each metric
-    for i, col in enumerate(df.columns):
-        if col in ['epoch', 'mode']:
-            continue
+    for i, col in enumerate(ordered_cols):
+        ax = axes[i]
+        ax.plot(train_df['epoch'], train_df[col], label='train')
 
-        # Calculate row and column position
-        row = i // plots_per_row
-        col_idx = i % plots_per_row
+        # For validation, skip plotting if it's a relevance metric
+        if len(valid_df) > 0 and not col.startswith("relevance"):
+            ax.plot(valid_df['epoch'], valid_df[col], label='valid')
 
-        train_df = df[df['mode'] == 'train']
-        valid_df = df[df['mode'] == 'valid']
+        ax.set_title(col, fontweight="bold")
 
-        ax[row, col_idx].plot(train_df['epoch'].values,
-                              train_df[col].values,
-                              label='train')
-        if len(valid_df) > 0:
-            ax[row, col_idx].plot(valid_df['epoch'].values,
-                                  valid_df[col].values,
-                                  label='valid')
+        # Force [0,1] range for relevance columns
+        if col.startswith("relevance"):
+            ax.set_ylim(0, 1)
 
-        ax[row, col_idx].set_title(col, fontweight="bold")
+    # Remove any unused subplots (if total < n_rows*n_cols)
+    for j in range(n_metrics, len(axes)):
+        fig.delaxes(axes[j])
 
-        # Add legend to the last plot in the grid
-        if i == n_metrics - 1:
-            handles, labels = ax[row, col_idx].get_legend_handles_labels()
-            fig.legend(handles, ['train', 'valid'], loc='right')
+    # Create a legend if anything was plotted
+    handles, labels = axes[0].get_legend_handles_labels()
+    if handles and labels:
+        fig.legend(handles, labels, loc='upper right')
 
-    # Remove empty subplots if any
-    if n_metrics % plots_per_row != 0:
-        for j in range(n_metrics % plots_per_row, plots_per_row):
-            fig.delaxes(ax[-1, j])
-
-    if save_path is not None:
+    plt.tight_layout()
+    if save_path:
         plt.savefig(save_path, bbox_inches='tight', dpi=100)
+    plt.show()

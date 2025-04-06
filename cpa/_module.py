@@ -89,8 +89,11 @@ class CPAModule(BaseModuleClass):
                  variational: bool = False,
                  seed: int = 0,
                  use_intense: bool = False,
+                 use_rite:    bool = False,
                  intense_reg_rate: float = 0.01,
-                 intense_p: int = 1
+                 intense_p: int = 1,
+                 interaction_order: int = 3,
+                 rite_factor: float = 1,
                  ):
         super().__init__()
 
@@ -110,6 +113,8 @@ class CPAModule(BaseModuleClass):
 
         self.covars_encoder = covars_encoder
         self.use_intense = use_intense
+        self.use_rite = use_rite
+        self.rite_factor = rite_factor
 
         if self.use_intense:
             dim_dict_single = {
@@ -132,7 +137,8 @@ class CPAModule(BaseModuleClass):
                 track_running_stats=True,
                 out_features=n_latent,  # final output dimension = n_latent
                 intense_reg_rate=intense_reg_rate,
-                intense_p= intense_p
+                intense_p= intense_p,
+                interaction_order=interaction_order
             )
 
         if variational:
@@ -339,7 +345,11 @@ class CPAModule(BaseModuleClass):
                 "2": z_pert,  # shape [B, n_latent]
                 "3": z_covs,  # shape [B, n_latent]
             }
-            z = self.intense_fusion(z_dict_for_intense)
+            if self.use_rite:
+                z_additive = z_basal + z_pert + z_covs
+                z = z_additive + self.rite_factor * self.intense_fusion(z_dict_for_intense)
+            else:
+                z = self.intense_fusion(z_dict_for_intense)
         else:
          z = z_basal + z_pert + z_covs
         z_corrected = z_basal + z_pert + z_covs_wo_batch

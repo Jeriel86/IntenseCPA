@@ -22,9 +22,6 @@ if not os.path.exists(PREPROCESSED_DATA_PATH):
     adata = sc.read_h5ad(ORIGINAL_DATA_PATH)
     adata.X = adata.layers['counts'].copy()  # Set raw counts
 
-    # Add control column as in combo-sciplex example
-    adata.obs['control'] = (adata.obs['condition_ID'] == 'CHEMBL504').astype(int)
-
     # Save the preprocessed data
     adata.write_h5ad(PREPROCESSED_DATA_PATH)
     print(f"Preprocessed data saved to {PREPROCESSED_DATA_PATH}")
@@ -59,7 +56,7 @@ model_args = {
     'valid_split': 'valid',
     'test_split': 'ood',
     'use_intense': True,
-    'intense_reg_rate': tune.choice([0.001, 0.005, 0.01, 0.05, 0.1]),
+    'intense_reg_rate': tune.choice([0.0,0.001, 0.005, 0.01, 0.05, 0.1]),
     'intense_p': tune.choice([1, 2])
 }
 
@@ -90,6 +87,7 @@ train_args = {
     'do_clip_grad': tune.choice([True, False]),
     'gradient_clip_value': tune.choice([1.0]),
     'step_size_lr': tune.choice([10, 25, 45]),
+    'momentum': tune.uniform(0.0, 0.99),
 }
 plan_kwargs_keys = list(train_args.keys())
 
@@ -112,7 +110,7 @@ search_space = {
 scheduler_kwargs = {
     'max_t': 1000,
     'grace_period': 5,
-    'reduction_factor': 3,
+    'reduction_factor': 4,
 }
 
 # AnnData setup arguments (adapted from combo-sciplex example)
@@ -130,26 +128,26 @@ setup_anndata_kwargs = {
 
 # Setup AnnData with preprocessed data
 model = cpa.CPA
+os.environ ["CUDA_VISIBLE_DEVICES"]="0"
 model.setup_anndata(adata, **setup_anndata_kwargs)
 
 # Resources for training
 resources = {
-    "cpu": 8,
+    "cpu": 16,
     "gpu":1,
-    "memory": 130 * 1024 * 1024 * 1024  # 183 GiB
+    "memory": 100 * 1024 * 1024 * 1024  # 183 GiB
 }
 
 # Run hyperparameter tuning
-EXPERIMENT_NAME = "cpa_autotune_combo"
-CHECKPOINT_DIR  = os.path.join(LOGGING_DIR, EXPERIMENT_NAME)
-
+EXPERIMENT_NAME = "cpa_autotune_combo_newest"
+os.environ ["CUDA_VISIBLE_DEVICES"]="1"
 experiment = run_autotune(
         model_cls=model,
         data=adata,
-        metrics=["cpa_metric", "r2_mean_deg", "r2_var_deg", "r2_mean_lfc_deg", "r2_var_lfc_deg"],
+        metrics=["cpa_metric", "disnt_basal", "disnt_after", "r2_mean", "val_r2_mean", "val_r2_var", "val_recon"],
         mode="max",
         search_space=search_space,
-        num_samples=200,
+        num_samples=300,
         scheduler="asha",
         searcher="hyperopt",
         seed=1,
@@ -160,7 +158,7 @@ experiment = run_autotune(
         sub_sample=None,
         setup_anndata_kwargs=setup_anndata_kwargs,
         use_wandb=True,
-        wandb_name="cpa_tune_combo",
+        wandb_name="cpa_tune_combo_newest",
         scheduler_kwargs=scheduler_kwargs,
         plan_kwargs_keys=plan_kwargs_keys,
     )

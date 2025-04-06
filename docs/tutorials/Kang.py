@@ -54,8 +54,8 @@ sc.settings.set_figure_params(dpi=100)
 data_path = os.path.join(current_dir, "datasets", "kang_normalized_hvg.h5ad")
 
 # Define save path for the results(model, images, csv)
-save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_2803')
-
+save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_Rite_2_config2')
+sc.settings.figdir = save_path
 # --- Loading dataset ---
 
 # Load the preprocessed Kang PBMC dataset
@@ -112,26 +112,56 @@ model_params = {
     "variational": False,
     "seed": 6977,
     "use_intense": True,
-    "intense_reg_rate": 0.01,
-    "intense_p": 1
+    "use_rite": True,
+    "intense_reg_rate": 0.1,
+    "intense_p": 1,
+    "interaction_order": 2,
+    "rite_factor": 1,
 }
 
 trainer_params = {
-    "n_epochs_kl_warmup": None,
-    "n_epochs_pretrain_ae": 5,
     "n_epochs_adv_warmup": 5,
-    "n_epochs_mixup_warmup": 5,
-    "mixup_alpha": 0.2,
-    "adv_steps": 3,
-    "n_hidden_adv": 128,
+    "n_epochs_kl_warmup": None,
+    "n_epochs_pretrain_ae": 10,
+    "adv_steps": 5,
+    "mixup_alpha": 0.1,
+    "n_epochs_mixup_warmup": 3,
     "n_layers_adv": 4,
-    "use_batch_norm_adv": False,
+    "n_hidden_adv": 64,
+    "use_batch_norm_adv": True,
     "use_layer_norm_adv": False,
     "dropout_rate_adv": 0.3,
+    "pen_adv": 1.0754212899512865,
+    "reg_adv": 1.7536582421567608,
+    "lr": 0.00610331507808799,
+    "wd": 0.00000001500803976284,
+    "doser_lr": 0.004392578706283446,
+    "doser_wd": 0.00000263511691407522,
+    "adv_lr": 0.0000532609227647633,
+    "adv_wd": 0.00000010496500499614,
+    "adv_loss": "cce",
+    "do_clip_grad": True,
+    "gradient_clip_value": 1.0,
+    "step_size_lr": 25,
+    "momentum": 0.8381474745171963
+}
+
+"""trainer_params = {
+    "n_epochs_kl_warmup": None,
+    "n_epochs_pretrain_ae": 0,
+    "n_epochs_adv_warmup": 5,
+    "n_epochs_mixup_warmup": 10,
+    "mixup_alpha": 0.2,
+    "adv_steps": 2,
+    "n_hidden_adv": 256,
+    "n_layers_adv": 3,
+    "use_batch_norm_adv": False,
+    "use_layer_norm_adv": False,
+    "dropout_rate_adv": 0.25,
     "reg_adv": 2.43828696766268,
     "pen_adv": 4.1724722219803425,
     "lr": 0.0001533493418490112,
-    "wd": 0.0000000791130083766,
+    "wd": 0,
     "adv_lr": 0.0005984734868477526,
     "adv_wd": 0.00000001201376573356,
     "adv_loss": "cce",
@@ -140,8 +170,8 @@ trainer_params = {
     "do_clip_grad": False,
     "gradient_clip_value": 1.0,
     "step_size_lr": 25,
-    "momentum": 0,
-}
+    "momentum": 0.0,
+}"""
 # --- Creating CPA Model ---
 print("model build....")
 # Exclude B cells treated with IFN-beta from training (OOD set)
@@ -159,7 +189,7 @@ print("Start training")
 model.train(
     max_epochs=2000,
     use_gpu=True,  # Set to True if GPU is available
-    batch_size=512,
+    batch_size=1024,
     plan_kwargs=trainer_params,
     early_stopping_patience=10,
     check_val_every_n_epoch=5,
@@ -194,12 +224,6 @@ sc.pl.umap(
     save='latent_basal.png'  # Saves the plot as a file
 )
 
-os.rename(
-    os.path.join(sc.settings.figdir, f'umaplatent_basal.png'),
-    os.path.join(save_path, f'latent_basal.png')
-)
-
-
 # Final latent space (after condition and cell_type embeddings)
 sc.pp.neighbors(latent_outputs['latent_after'])
 sc.tl.umap(latent_outputs['latent_after'])
@@ -210,10 +234,7 @@ sc.pl.umap(
     wspace=0.3,
     save='latent_after.png'  # Saves the plot as a file
 )
-os.rename(
-    os.path.join(sc.settings.figdir, f'umaplatent_after.png'),
-    os.path.join(save_path, f'latent_after.png')
-)
+
 # --- Evaluation ---
 
 # Predict perturbation responses

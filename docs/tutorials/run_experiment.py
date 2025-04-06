@@ -19,17 +19,18 @@ parser.add_argument("--intense_p", type=int, default=None, help="p value for int
 args = parser.parse_args()
 
 # --- Setting up environment ---
-current_dir = "/home/nmbiedou/Documents/cpa"
+current_dir = "/scratch/nmbiedou"
+data_dir = "/home/nmbiedou/Documents/cpa"
 sc.settings.set_figure_params(dpi=100)
-data_path = os.path.join(current_dir, "datasets", "kang_normalized_hvg.h5ad")
+data_path = os.path.join(data_dir, "datasets", "kang_normalized_hvg.h5ad")
 
 # Save path based on parameters
 if args.use_intense:
-    save_path = os.path.join(current_dir, 'lightning_logs', f'Kang_Intense_reg_{str(args.intense_reg_rate).replace(".", "_")}_p_{args.intense_p}_seed_{args.seed}')
+    save_path = os.path.join(current_dir, 'lightning_logs/Kang_rite', f'Kang_Intense_reg_{str(args.intense_reg_rate).replace(".", "_")}_p_{args.intense_p}_seed_{args.seed}')
 else:
-    save_path = os.path.join(current_dir, 'lightning_logs', f'Kang_Original_seed_{args.seed}')
+    save_path = os.path.join(current_dir, 'lightning_logs/Kang_rite', f'Kang_Original_seed_{args.seed}')
 os.makedirs(save_path, exist_ok=True)
-
+sc.settings.figdir = save_path
 # --- Loading dataset ---
 try:
     adata = sc.read(data_path)
@@ -74,33 +75,37 @@ if args.use_intense:
         "variational": False,
         "seed": args.seed,
         "use_intense": True,
+        "use_rite": True,
         "intense_reg_rate": args.intense_reg_rate,
-        "intense_p": args.intense_p
+        "intense_p": args.intense_p,
+        "interaction_order":2,
+        "rite_factor":0.9
     }
     trainer_params = {
-        "n_epochs_adv_warmup": 50,
+        "n_epochs_adv_warmup": 10,
         "n_epochs_kl_warmup": None,
-        "n_epochs_pretrain_ae": 50,
-        "adv_steps": 25,
-        "mixup_alpha": 0.4,
+        "n_epochs_pretrain_ae": 30,
+        "adv_steps": 2,
+        "mixup_alpha": 0.2,
         "n_epochs_mixup_warmup": 10,
-        "n_layers_adv": 3,
-        "n_hidden_adv": 128,
-        "use_batch_norm_adv": False,
+        "n_layers_adv": 2,
+        "n_hidden_adv": 64,
+        "use_batch_norm_adv": True,
         "use_layer_norm_adv": False,
-        "dropout_rate_adv": 0.2,
-        "pen_adv": 0.11365120590623315,
-        "reg_adv": 7.548710689140497,
-        "lr": 0.00022113845515422882,
-        "wd": 5.058319112901893e-07,
-        "doser_lr": 7.922830804356762e-05,
-        "doser_wd": 3.668791334427708e-07,
-        "adv_lr": 0.0004452564471071731,
-        "adv_wd": 5.586698835451053e-07,
+        "dropout_rate_adv": 0.25,
+        "pen_adv": 0.21176187723505563,
+        "reg_adv": 3.3191059919680557,
+        "lr": 0.00656775854452724,
+        "wd": 0.00000017930296245015,
+        "doser_lr": 0.00034816913906047706,
+        "doser_wd": 0.00000139054966251716,
+        "adv_lr": 0.0005237774528387638,
+        "adv_wd": 0.00000015681818353966,
         "adv_loss": "cce",
-        "do_clip_grad": False,
+        "do_clip_grad": True,
         "gradient_clip_value": 1.0,
         "step_size_lr": 25,
+        "momentum": 0.9007079992500057
     }
 else:
     model_params = {
@@ -185,10 +190,6 @@ sc.pl.umap(
     save=f'latent_basal_seed_{args.seed}.png',
     show=False
 )
-os.rename(
-    os.path.join(sc.settings.figdir, f'umaplatent_basal_seed_{args.seed}.png'),
-    os.path.join(save_path, f'latent_basal_seed_{args.seed}.png')
-)
 
 # Final latent space
 sc.pp.neighbors(latent_outputs['latent_after'])
@@ -200,10 +201,6 @@ sc.pl.umap(
     wspace=0.3,
     save=f'latent_after_seed_{args.seed}.png',
     show=False
-)
-os.rename(
-    os.path.join(sc.settings.figdir, f'umaplatent_after_seed_{args.seed}.png'),
-    os.path.join(save_path, f'latent_after_seed_{args.seed}.png')
 )
 
 # --- Evaluation ---
@@ -256,7 +253,7 @@ df = pd.DataFrame(results)
 df.to_csv(os.path.join(save_path, f'evaluation_results_seed_{args.seed}.csv'), index=False)
 
 # Save results to a shared location for aggregation
-results_dir = os.path.join(current_dir, 'lightning_logs', 'experiment_results')
+results_dir = os.path.join(current_dir, 'lightning_logs/Kang_rite', 'experiment_results')
 os.makedirs(results_dir, exist_ok=True)
 if args.use_intense:
     result_file = os.path.join(results_dir, f'result_seed_{args.seed}_intense_{str(args.intense_reg_rate).replace(".", "_")}_{args.intense_p}.csv')
