@@ -18,7 +18,7 @@ model_params = {
         "intense_reg_rate": args.intense_reg_rate,
         "intense_p": args.intense_p
     }
-    trainer_params = {
+trainer_params = {
         "n_epochs_adv_warmup": 5,
         "n_epochs_kl_warmup": None,
         "n_epochs_pretrain_ae": 1,

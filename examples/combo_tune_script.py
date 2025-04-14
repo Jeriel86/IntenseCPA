@@ -7,6 +7,25 @@ import pickle
 import os
 import gdown
 
+
+# Save the original CUDA_VISIBLE_DEVICES (if set by the cluster)
+_original_cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", None)
+
+# For setup_anndata: restrict GPU visibility to only one GPU.
+if _original_cuda_visible_devices:
+    # If CUDA_VISIBLE_DEVICES is already set (possibly multiple GPUs),
+    # select only the first one.
+    single_device = _original_cuda_visible_devices.split(",")[0]
+    os.environ["CUDA_VISIBLE_DEVICES"] = single_device
+else:
+    # If the variable is not set, try to detect available GPUs and restrict to GPU 0.
+    try:
+        import torch
+        if torch.cuda.device_count() > 0:
+            os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    except ImportError:
+        pass  # If torch is not available, do nothing.
+
 # Define paths based on combo-sciplex structure
 PROJECT_ROOT = "/home/nmbiedou/Documents/cpa"
 ORIGINAL_DATA_PATH = os.path.join(PROJECT_ROOT, "datasets", "combo_sciplex_prep_hvg_filtered.h5ad")
@@ -56,7 +75,9 @@ model_args = {
     'valid_split': 'valid',
     'test_split': 'ood',
     'use_intense': True,
-    'intense_reg_rate': tune.choice([0.0,0.001, 0.005, 0.01, 0.05, 0.1]),
+    "use_rite": False,
+    "interaction_order": tune.choice([2, 3]),
+    'intense_reg_rate': tune.loguniform(1e-3, 1e-1),
     'intense_p': tune.choice([1, 2])
 }
 
@@ -93,10 +114,11 @@ plan_kwargs_keys = list(train_args.keys())
 
 # Trainer arguments
 trainer_actual_args = {
-    'max_epochs': 300,
+    'max_epochs': 2000,
     'use_gpu': True,
     'early_stopping_patience': 10,
-    'check_val_every_n_epoch': 5
+    'check_val_every_n_epoch': 5,
+    'batch_size': 128
 }
 train_args.update(trainer_actual_args)
 
@@ -108,9 +130,9 @@ search_space = {
 
 # Scheduler settings for ASHA
 scheduler_kwargs = {
-    'max_t': 1000,
+    'max_t': 500,
     'grace_period': 5,
-    'reduction_factor': 4,
+    'reduction_factor': 3,
 }
 
 # AnnData setup arguments (adapted from combo-sciplex example)
@@ -128,26 +150,29 @@ setup_anndata_kwargs = {
 
 # Setup AnnData with preprocessed data
 model = cpa.CPA
-os.environ ["CUDA_VISIBLE_DEVICES"]="0"
 model.setup_anndata(adata, **setup_anndata_kwargs)
 
 # Resources for training
 resources = {
-    "cpu": 16,
-    "gpu":1,
-    "memory": 100 * 1024 * 1024 * 1024  # 183 GiB
+    "cpu": 10,
+    "gpu":2,
+    "memory": 80 * 1024 * 1024 * 1024  # 183 GiB
 }
 
+if _original_cuda_visible_devices is not None:
+    os.environ["CUDA_VISIBLE_DEVICES"] = _original_cuda_visible_devices
+else:
+    os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+
 # Run hyperparameter tuning
-EXPERIMENT_NAME = "cpa_autotune_combo_newest"
-os.environ ["CUDA_VISIBLE_DEVICES"]="1"
+EXPERIMENT_NAME = "cpa_autotune_combo_1104"
 experiment = run_autotune(
         model_cls=model,
         data=adata,
         metrics=["cpa_metric", "disnt_basal", "disnt_after", "r2_mean", "val_r2_mean", "val_r2_var", "val_recon"],
         mode="max",
         search_space=search_space,
-        num_samples=300,
+        num_samples=200,
         scheduler="asha",
         searcher="hyperopt",
         seed=1,
@@ -158,7 +183,7 @@ experiment = run_autotune(
         sub_sample=None,
         setup_anndata_kwargs=setup_anndata_kwargs,
         use_wandb=True,
-        wandb_name="cpa_tune_combo_newest",
+        wandb_name="cpa_tune_combo_1104",
         scheduler_kwargs=scheduler_kwargs,
         plan_kwargs_keys=plan_kwargs_keys,
     )

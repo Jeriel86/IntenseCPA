@@ -7,9 +7,12 @@ This script is parameterized for reproducibility and flexibility.
 Usage example:
     python script.py --seed 434 --use_intense 1 --intense_reg_rate 0.1 --intense_p 1
 """
-
+import hashlib
 import os
 import argparse
+import random
+import time
+
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -20,12 +23,14 @@ from collections import defaultdict
 from sklearn.metrics import r2_score
 from tqdm import tqdm
 
+from docs.tutorials.utils import append_to_csv
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Run CPA on the combo-sciplex dataset with configurable settings."
     )
-    parser.add_argument("--seed", type=int, required=True, help="Random seed for reproducibility")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
     parser.add_argument("--use_intense", type=int, choices=[0, 1], required=True,
                         help="0 for original CPA, 1 for INTENSE CPA")
     parser.add_argument("--intense_reg_rate", type=float, default=None,
@@ -42,20 +47,35 @@ def setup_paths(current_dir, use_intense, seed, intense_reg_rate, intense_p):
     data_path = os.path.join(data_dir, "datasets", "combo_sciplex_prep_hvg_filtered.h5ad")
     if use_intense:
         save_path = os.path.join(
-            current_dir, "lightning_logs/Combo",
+            current_dir, "experiment/Combo_Order_2",
             f"combo_Intense_reg_{str(intense_reg_rate).replace('.', '_')}_p_{intense_p}_seed_{seed}"
         )
     else:
         save_path = os.path.join(
-            current_dir, "lightning_logs/Combo",
+            current_dir, "experiment/Combo_Order_2",
             f"combo_Original_seed_{seed}"
         )
     os.makedirs(save_path, exist_ok=True)
-    return data_path, save_path
+    results_dir = os.path.join(current_dir, 'experiment/Combo_Order_2', 'experiment_results')
+    os.makedirs(results_dir, exist_ok=True)
+    log_file = os.path.join(results_dir, 'experiment_log.csv')
+
+    return data_path, save_path, log_file
 
 
 def setup_hparams(args):
     # Base hyperparameters common to both settings
+    if args.seed is None:
+        # Get SLURM_ARRAY_TASK_ID, default to 0 if not running in SLURM array
+        task_id = int(os.getenv('SLURM_ARRAY_TASK_ID', '0'))
+        # Create a unique string combining time and task_id
+        seed_input = f"{int(time.time() * 1000)}_{task_id}"
+        # Hash the string and take the first 4 digits of the hex digest as the seed
+        seed_hash = hashlib.md5(seed_input.encode()).hexdigest()
+        args.seed = int(seed_hash[:4], 16) % 10000  # Convert hex to int, keep in 0-9999 range
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+
     base_hparams = {
         "n_latent": 128,
         "recon_loss": "nb",
@@ -104,61 +124,35 @@ def setup_hparams(args):
         base_hparams.update({
             "use_intense": True,
             "intense_reg_rate": args.intense_reg_rate,
+            "interaction_order": 2,
             "intense_p": args.intense_p
         })
         trainer_params = {
             "n_epochs_kl_warmup": None,
-            "n_epochs_pretrain_ae": 30,
+            "n_epochs_pretrain_ae": 5,
             "n_epochs_adv_warmup": 3,
-            "n_epochs_mixup_warmup": 5,
-            "mixup_alpha": 0.2,
-            "adv_steps": 2,
-            "n_hidden_adv": 128,
+            "n_epochs_mixup_warmup": 0,
+            "mixup_alpha": 0,
+            "adv_steps": 3,
+            "n_hidden_adv": 64,
             "n_layers_adv": 3,
             "use_batch_norm_adv": True,
             "use_layer_norm_adv": False,
-            "dropout_rate_adv": 0.2,
-            "reg_adv": 3.0971323868967953,
-            "pen_adv": 25.704293419846707,
-            "lr": 0.00012327764184994234,
-            "wd": 0.00000058430661242085,
-            "adv_lr": 0.0002694622540971205,
-            "adv_wd": 0.00000010572864739337,
+            "dropout_rate_adv": 0,
+            "reg_adv": 0.8032532418606549,
+            "pen_adv": 16.07622882323635,
+            "lr": 0.0012865737443496822,
+            "wd": 0.00000910749307309212,
+            "adv_lr": 0.00038342243722983504,
+            "adv_wd": 0.00000489043147013771,
             "adv_loss": "cce",
-            "doser_lr": 0.0000708626466965261,
-            "doser_wd": 0.00000304201763025341,
+            "doser_lr": 0.0007735652253832272,
+            "doser_wd": 0.00000002529886527883,
             "do_clip_grad": False,
             "gradient_clip_value": 1,
-            "step_size_lr": 10,
-            "momentum": 0.9103426728054762
-        }
-
-        """trainer_params = {
-            "n_epochs_kl_warmup": None,
-            "n_epochs_pretrain_ae": 3,
-            "n_epochs_adv_warmup": 3,
-            "n_epochs_mixup_warmup": 10,
-            "mixup_alpha": 0.1,
-            "adv_steps": 2,
-            "n_hidden_adv": 256,
-            "n_layers_adv": 2,
-            "use_batch_norm_adv": False,
-            "use_layer_norm_adv": True,
-            "dropout_rate_adv": 0,
-            "reg_adv": 1.419091687459432,
-            "pen_adv": 12.775412073171998,
-            "lr": 0.003273373979034034,
-            "wd": 4e-07,
-            "adv_lr": 0.00015304936848310163,
-            "adv_wd": 0.00000011309928874122,
-            "adv_loss": "cce",
-            "doser_lr": 0.0007629540879596654,
-            "doser_wd": 0.00000043589345787571,
-            "do_clip_grad": False,
-            "gradient_clip_value": 1.0,
             "step_size_lr": 25,
-            "momentum": 0.5126039493891473
-        }"""
+            "momentum": 0.3264281156751794
+        }
     else:
         base_hparams["use_intense"] = False
 
@@ -172,8 +166,11 @@ def main():
     if args.use_intense and (args.intense_reg_rate is None or args.intense_p is None):
         raise ValueError("For --use_intense 1, --intense_reg_rate and --intense_p must be provided.")
 
+    # Get hyperparameters and trainer settings
+    ae_hparams, trainer_params = setup_hparams(args)
+
     # Set up directories and file paths
-    data_path, save_path = setup_paths(args.current_dir, args.use_intense, args.seed,
+    data_path, save_path, log_file = setup_paths(args.current_dir, args.use_intense, args.seed,
                                        args.intense_reg_rate, args.intense_p)
 
     # Set figure parameters for scanpy
@@ -184,6 +181,23 @@ def main():
         adata = sc.read(data_path)
     except FileNotFoundError:
         raise FileNotFoundError("Dataset not found locally. Please download the dataset manually.")
+
+    print(
+        f"Running experiment with seed: {args.seed}, use_intense: {args.use_intense}, intense_reg_rate: {args.intense_reg_rate}, intense_p: {args.intense_p}")
+
+    # Get SLURM task ID (if available)
+    task_id = os.getenv('SLURM_ARRAY_TASK_ID', 'unknown')
+
+    # Prepare the log entry
+    log_entry = {
+        'task_id': task_id,
+        'use_intense': args.use_intense,
+        'intense_reg_rate': args.intense_reg_rate if args.use_intense else None,
+        'intense_p': args.intense_p if args.use_intense else None,
+        'seed': args.seed,
+        'save_path': save_path
+    }
+    append_to_csv(log_entry, log_file)
 
     # Prepare data for CPA using raw counts
     adata.X = adata.layers["counts"].copy()
@@ -202,9 +216,6 @@ def main():
         deg_uns_cat_key="cov_drug_dose",
         max_comb_len=2,
     )
-
-    # Get hyperparameters and trainer settings
-    ae_hparams, trainer_params = setup_hparams(args)
 
     # Create CPA model
     model = cpa.CPA(
@@ -230,6 +241,14 @@ def main():
     # Plot training history
     history_plot_path = os.path.join(save_path, "history.png")
     cpa.pl.plot_history(model, history_plot_path)
+    results_dir = os.path.join(args.current_dir, 'experiment/Combo_Order_2', 'experiment_results')
+    os.makedirs(results_dir, exist_ok=True)
+
+    if args.use_intense:
+        scores = model.module.intense_fusion.mkl_fusion.scores()
+        scores_file = os.path.join(results_dir,
+                                   f'scores_reg_{str(args.intense_reg_rate).replace(".", "_")}_p_{args.intense_p}.csv')
+        append_to_csv(scores, scores_file)
 
     # Latent space visualization
     latent_outputs = model.get_latent_representation(adata, batch_size=128)
@@ -300,10 +319,7 @@ def main():
                 results['r2_var_lfc_deg'].append(r2_var_lfc_deg)
 
     df = pd.DataFrame(results)
-    print(df)
     df.to_csv(os.path.join(save_path, 'evaluation_results.csv'), index=False)
-    results_dir = os.path.join(args.current_dir, 'lightning_logs/Combo', 'experiment_results')
-    os.makedirs(results_dir, exist_ok=True)
     result_file = (os.path.join(results_dir, f'result_seed_{args.seed}_intense_'
                                              f'{str(args.intense_reg_rate).replace(".", "_")}_{args.intense_p}.csv')
                    if args.use_intense else

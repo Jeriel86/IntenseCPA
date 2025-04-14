@@ -1338,3 +1338,57 @@ def plot_history(model: CPA, save_path: Optional[str] = None):
     if save_path:
         plt.savefig(save_path, bbox_inches='tight', dpi=100)
     plt.show()
+
+def plot_relevance_scores(mkl_fusion_module, save_path: Optional[str] = None):
+        """
+        Plot an aesthetically enhanced bar plot of relevance scores from an MKLFusion instance.
+
+        Args:
+            mkl_fusion_module: An instance of MKLFusion that implements a scores() method. The scores() method
+                               should return a dictionary with modality keys and normalized relevance scores as values.
+
+        The y-axis is fixed to [0,1] and the plot is styled using a modern Seaborn theme.
+        """
+        sns.set_theme(context="talk", style="white", palette="muted")
+
+        # Get the relevance scores dictionary
+        relevance_dict = mkl_fusion_module.scores()
+        modalities = list(relevance_dict.keys())
+        scores = list(relevance_dict.values())
+
+        # Choose a pleasant color palette for the bars. Here we use Set2 from Seaborn.
+        custom_colors = sns.color_palette("Set2", len(modalities))
+
+        # Create the figure with an appropriate size for a thesis.
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        # Draw the bar plot
+        bars = ax.bar(modalities, scores, color=custom_colors, edgecolor="black", linewidth=1.5)
+
+        # Set axis labels and title with custom fonts and weights.
+        ax.set_xlabel("Modalities", fontsize=16, fontweight="bold")
+        ax.set_ylabel("Relevance Score", fontsize=16, fontweight="bold")
+        ax.set_title("Relevance Scores of Modalities", fontsize=18, fontweight="bold")
+
+        # Force the y-axis to range from 0 to 1.
+        ax.set_ylim(0, 1)
+
+        # Annotate each bar with its numerical value.
+        for bar, score in zip(bars, scores):
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                height + 0.02,  # add a little offset above the bar
+                f"{score:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=14,
+                fontweight="bold",
+                color="black"
+            )
+
+        # Improve layout for publication.
+        plt.tight_layout()
+        plt.show()
+        if save_path:
+            plt.savefig(save_path, bbox_inches='tight', dpi=100)
