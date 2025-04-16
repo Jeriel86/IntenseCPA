@@ -93,6 +93,7 @@ class CPAModule(BaseModuleClass):
                  intense_reg_rate: float = 0.01,
                  intense_p: int = 1,
                  interaction_order: int = 3,
+                 intense_interaction_rank: int = 64,
                  rite_factor: float = 1,
                  ):
         super().__init__()
@@ -124,10 +125,11 @@ class CPAModule(BaseModuleClass):
             }
 
             feature_dim_dict_triple = {
-                "12": n_latent * n_latent,  # e.g. "basal⊗pert"
-                "13": n_latent * n_latent,  # e.g. "basal⊗covar"
-                "23": n_latent * n_latent,  # e.g. "pert⊗covar"
-                "123": n_latent * n_latent * n_latent  # e.g. "basal⊗pert⊗covar"
+                "12": n_latent ,  # e.g. "basal⊗pert"
+                "13": n_latent ,  # e.g. "basal⊗covar"
+                "23": n_latent ,  # e.g. "pert⊗covar"
+                "123": n_latent,  # e.g. "basal⊗pert⊗covar"
+
             }
 
             # Then build an InTense module:
@@ -138,7 +140,8 @@ class CPAModule(BaseModuleClass):
                 out_features=n_latent,  # final output dimension = n_latent
                 intense_reg_rate=intense_reg_rate,
                 intense_p= intense_p,
-                interaction_order=interaction_order
+                interaction_order=interaction_order,
+                intense_interaction_rank=intense_interaction_rank
             )
 
         if variational:

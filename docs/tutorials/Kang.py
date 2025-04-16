@@ -54,7 +54,7 @@ sc.settings.set_figure_params(dpi=100)
 data_path = os.path.join(current_dir, "datasets", "kang_normalized_hvg.h5ad")
 
 # Define save path for the results(model, images, csv)
-save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_Order_2_debug_2')
+save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_Order_2_debug_rank_3')
 sc.settings.figdir = save_path
 # --- Loading dataset ---
 
@@ -116,34 +116,36 @@ model_params = {
     "intense_reg_rate": 0.1,
     "intense_p": 1,
     "interaction_order": 2,
+    "intense_interaction_rank": 64
 }
 
 trainer_params = {
-        "n_epochs_adv_warmup": 0,
-        "n_epochs_kl_warmup": None,
-        "n_epochs_pretrain_ae": 40,
-        "adv_steps": 2,
-        "mixup_alpha": 0.3,
-        "n_epochs_mixup_warmup": 3,
-        "n_layers_adv": 1,
-        "n_hidden_adv": 64,
-        "use_batch_norm_adv": False,
-        "use_layer_norm_adv": True,
-        "dropout_rate_adv": 0.25,
-        "pen_adv": 0.8543559662702802,
-        "reg_adv": 1.0525942325413844,
-        "lr": 0.00020036683900918832,
-        "wd": 0.00000002740420231004,
-        "doser_lr": 0.0001808693526310397,
-        "doser_wd": 0.00000003445532526714,
-        "adv_lr": 0.0011418884883605857,
-        "adv_wd": 0.00000559869643135145,
-        "adv_loss": "cce",
-        "do_clip_grad": False,
-        "gradient_clip_value": 1,
-        "step_size_lr": 45,
-        "momentum": 0.3034310866721415
-    }
+    "n_epochs_adv_warmup": 10,
+    "n_epochs_kl_warmup": None,
+    "n_epochs_pretrain_ae": 30,
+    "adv_steps": 3,
+    "mixup_alpha": 0,
+    "n_epochs_mixup_warmup": 0,
+    "n_layers_adv": 3,
+    "n_hidden_adv": 128,
+    "use_batch_norm_adv": True,
+    "use_layer_norm_adv": False,
+    "dropout_rate_adv": 0.3,
+    "pen_adv": 4.294390049837101,
+    "reg_adv": 3.3719251924586913,
+    "lr": 0.0002131022109464524,
+    "wd": 0.00000005093514772391,
+    "doser_lr": 0.00018507818483183403,
+    "doser_wd": 0.00000018398824103551,
+    "adv_lr": 0.0000689229784545762,
+    "adv_wd": 0.00000001991029166558,
+    "adv_loss": "cce",
+    "do_clip_grad": False,
+    "gradient_clip_value": 1,
+    "step_size_lr": 10,
+    "momentum": 0.6793210835317458
+}
+
 
 
 """trainer_params = {

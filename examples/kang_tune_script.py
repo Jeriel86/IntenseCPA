@@ -77,9 +77,10 @@ model_args = {
     'test_split': 'ood',
     'use_intense': True,
     "use_rite": False,
-    "interaction_order": tune.choice([1, 2, 3]),
+    "interaction_order": 2,
     'intense_reg_rate': tune.loguniform(1e-3, 1e-1),
-    'intense_p': tune.choice([1, 2])
+    'intense_interaction_rank': 64,
+    'intense_p': 1
 }
 
 # Training hyperparameters for tuning
@@ -118,8 +119,8 @@ trainer_actual_args = {
     'max_epochs': 2000,
     'use_gpu': True,
     'check_val_every_n_epoch': 5,
-    'batch_size': tune.choice([128, 256, 512]),
-    'early_stopping_patience': tune.choice([5,10])
+    'batch_size': 512,
+    'early_stopping_patience': 10
 }
 train_args.update(trainer_actual_args)
 
@@ -177,13 +178,13 @@ experiment = run_autotune(
     searcher="hyperopt",
     seed=1,
     resources=resources,
-    experiment_name="cpa_kang_tune_with_batchsize",
+    experiment_name="cpa_kang_tune_rank_optimal",
     logging_dir=LOGGING_DIR,
     adata_path=PREPROCESSED_DATA_PATH,  # Use preprocessed data path
     sub_sample=None,
     setup_anndata_kwargs=setup_anndata_kwargs,
     use_wandb=True,
-    wandb_name="cpa_kang_tune_with_batchsize",
+    wandb_name="cpa_kang_tune_rank_optimal",
     scheduler_kwargs=scheduler_kwargs,
     plan_kwargs_keys=plan_kwargs_keys,
 )
