@@ -70,7 +70,7 @@ model_args = {
     'test_split': 'ood',
     'use_rdkit_embeddings': True,
     'use_intense': True,
-    'interaction_order': tune.choice([2,3]),
+    'interaction_order': 2,
     'intense_reg_rate': tune.loguniform(1e-3, 1e-1),
     'intense_p': tune.choice([1, 2])
 }
@@ -160,7 +160,7 @@ else:
     os.environ.pop("CUDA_VISIBLE_DEVICES", None)
 
 # Run hyperparameter tuning
-EXPERIMENT_NAME = "cpa_autotune_combo_rdkit"
+EXPERIMENT_NAME = "cpa_autotune_combo_rdkit_order_2"
 
 experiment = run_autotune(
         model_cls=model,
@@ -179,7 +179,7 @@ experiment = run_autotune(
         sub_sample=None,
         setup_anndata_kwargs=setup_anndata_kwargs,
         use_wandb=True,
-        wandb_name="cpa_tune_combo_rdkit",
+        wandb_name="cpa_tune_combo_rdkit_order_2",
         scheduler_kwargs=scheduler_kwargs,
         plan_kwargs_keys=plan_kwargs_keys,
     )
