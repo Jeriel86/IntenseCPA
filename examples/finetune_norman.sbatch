@@ -3,9 +3,9 @@
 #SBATCH -J Norman_finetune        # Job name
 #SBATCH --mail-type=BEGIN,END,FAIL    # Email notifications
 #SBATCH -n 1                    # 1 task
-#SBATCH --cpus-per-task=8       # 8 CPU cores per task
+#SBATCH --cpus-per-task=16       # 8 CPU cores per task
 #SBATCH -N 1                    # 1 node
-#SBATCH --gres=gpu:a100:2           # 2 Tesla a100 GPUs
+#SBATCH --gres=gpu:v100:2           # 2 Tesla a100 GPUs
 #SBATCH --partition=gpuidle     # Target gpuidle partition
 #SBATCH --output=/home/nmbiedou/Documents/cpa/examples/slurm_%j.out  # Output log
 #SBATCH --error=/home/nmbiedou/Documents/cpa/examples/slurm_%j.err   # Error log

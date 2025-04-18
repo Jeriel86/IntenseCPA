@@ -60,11 +60,11 @@ class MKLFusion(nn.Module):
             b = torch.sum(norms ** (2 * self.p / (self.p + 1))) ** (1 / self.p)
             scores = a / b
             scores = scores / torch.sum(scores)
-            scores = scores.numpy()
+            scores = scores.cpu().numpy()
             return dict(zip(self.in_features.keys(), scores))
 
     def weight_norms(self):
-        return torch.tensor(
+        return torch.stack(
             [torch.linalg.matrix_norm(tens) for tens in self.weight]
         )
 

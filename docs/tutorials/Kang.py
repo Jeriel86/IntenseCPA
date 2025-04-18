@@ -54,7 +54,7 @@ sc.settings.set_figure_params(dpi=100)
 data_path = os.path.join(current_dir, "datasets", "kang_normalized_hvg.h5ad")
 
 # Define save path for the results(model, images, csv)
-save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_Rite_2_config2')
+save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_Order_2_debug_2')
 sc.settings.figdir = save_path
 # --- Loading dataset ---
 
@@ -110,41 +110,41 @@ model_params = {
     "dropout_rate_encoder": 0.0,
     "dropout_rate_decoder": 0.1,
     "variational": False,
-    "seed": 6977,
+    "seed": 6716,
     "use_intense": True,
-    "use_rite": True,
+    "use_rite": False,
     "intense_reg_rate": 0.1,
     "intense_p": 1,
     "interaction_order": 2,
-    "rite_factor": 1,
 }
 
 trainer_params = {
-    "n_epochs_adv_warmup": 5,
-    "n_epochs_kl_warmup": None,
-    "n_epochs_pretrain_ae": 10,
-    "adv_steps": 5,
-    "mixup_alpha": 0.1,
-    "n_epochs_mixup_warmup": 3,
-    "n_layers_adv": 4,
-    "n_hidden_adv": 64,
-    "use_batch_norm_adv": True,
-    "use_layer_norm_adv": False,
-    "dropout_rate_adv": 0.3,
-    "pen_adv": 1.0754212899512865,
-    "reg_adv": 1.7536582421567608,
-    "lr": 0.00610331507808799,
-    "wd": 0.00000001500803976284,
-    "doser_lr": 0.004392578706283446,
-    "doser_wd": 0.00000263511691407522,
-    "adv_lr": 0.0000532609227647633,
-    "adv_wd": 0.00000010496500499614,
-    "adv_loss": "cce",
-    "do_clip_grad": True,
-    "gradient_clip_value": 1.0,
-    "step_size_lr": 25,
-    "momentum": 0.8381474745171963
-}
+        "n_epochs_adv_warmup": 0,
+        "n_epochs_kl_warmup": None,
+        "n_epochs_pretrain_ae": 40,
+        "adv_steps": 2,
+        "mixup_alpha": 0.3,
+        "n_epochs_mixup_warmup": 3,
+        "n_layers_adv": 1,
+        "n_hidden_adv": 64,
+        "use_batch_norm_adv": False,
+        "use_layer_norm_adv": True,
+        "dropout_rate_adv": 0.25,
+        "pen_adv": 0.8543559662702802,
+        "reg_adv": 1.0525942325413844,
+        "lr": 0.00020036683900918832,
+        "wd": 0.00000002740420231004,
+        "doser_lr": 0.0001808693526310397,
+        "doser_wd": 0.00000003445532526714,
+        "adv_lr": 0.0011418884883605857,
+        "adv_wd": 0.00000559869643135145,
+        "adv_loss": "cce",
+        "do_clip_grad": False,
+        "gradient_clip_value": 1,
+        "step_size_lr": 45,
+        "momentum": 0.3034310866721415
+    }
+
 
 """trainer_params = {
     "n_epochs_kl_warmup": None,
@@ -189,7 +189,7 @@ print("Start training")
 model.train(
     max_epochs=2000,
     use_gpu=True,  # Set to True if GPU is available
-    batch_size=1024,
+    batch_size=512,
     plan_kwargs=trainer_params,
     early_stopping_patience=10,
     check_val_every_n_epoch=5,
@@ -197,9 +197,11 @@ model.train(
 )
 
 plot_path = os.path.join(save_path, "history.png")
+plot_path_scores = os.path.join(save_path, "scores.png")
 # Plot training history
 cpa.pl.plot_history(model,plot_path)
 
+cpa.pl.plot_relevance_scores(model.module.intense_fusion.mkl_fusion, plot_path_scores)
 # --- Restore Best Model (Optional) ---
 """model = cpa.CPA.load(
      dir_path=os.path.join(current_dir, 'lightning_logs', 'Kang'),
