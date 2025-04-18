@@ -76,8 +76,7 @@ model_args = {
     'valid_split': 'valid',
     'test_split': 'ood',
     'use_intense': True,
-    "use_rite": False,
-    "interaction_order": tune.choice([1, 2, 3]),
+    "interaction_order": 2,
     'intense_reg_rate': tune.loguniform(1e-3, 1e-1),
     'intense_p': tune.choice([1, 2])
 }
@@ -172,18 +171,18 @@ experiment = run_autotune(
     metrics=["cpa_metric", "disnt_basal", "disnt_after", "r2_mean", "val_r2_mean", "val_r2_var", "val_recon"],
     mode="max",
     search_space=search_space,
-    num_samples=200,
+    num_samples=100,
     scheduler="asha",
     searcher="hyperopt",
     seed=1,
     resources=resources,
-    experiment_name="cpa_kang_tune_with_batchsize",
+    experiment_name="cpa_kang_tune_main",
     logging_dir=LOGGING_DIR,
     adata_path=PREPROCESSED_DATA_PATH,  # Use preprocessed data path
     sub_sample=None,
     setup_anndata_kwargs=setup_anndata_kwargs,
     use_wandb=True,
-    wandb_name="cpa_kang_tune_with_batchsize",
+    wandb_name="cpa_kang_tune_main",
     scheduler_kwargs=scheduler_kwargs,
     plan_kwargs_keys=plan_kwargs_keys,
 )
