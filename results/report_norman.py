@@ -1,17 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Final Report Generator for CPA Experiments on the Norman Dataset
-
-This script generates a markdown report that explains:
-  1. The experimental setup (in-distribution vs. OOD evaluation).
-  2. The best Intense CPA settings (selected as the configuration with the highest average r2_mean_deg).
-  3. Two tables (one for in-distribution and one for OOD conditions) that list, for each n_top_deg:
-       - r2_mean_deg and r2_mean_lfc_deg for Original CPA and the best Intense CPA.
-       - The higher value in each metric is highlighted in bold.
-  4. Links (or image embeds) for latent space visualizations and training history plots.
-
-Update the paths as needed.
+Final Report Generator for CPA Experiments on the Norman Dataset with Standard Deviations
 """
 
 import os
@@ -19,110 +9,108 @@ import glob
 import pandas as pd
 from datetime import datetime
 from tabulate import tabulate
+import numpy as np
 
 # Define directories (adjust paths as needed)
 current_dir = "/Users/jeriel/Documents/WS24:25/MA/cpa/results/Norman"
-results_dir = os.path.join(current_dir,'experiment_results')
-report_file = os.path.join(results_dir, "final_report.md")
+results_dir = os.path.join(current_dir, 'experiment_results')
+report_file = os.path.join(results_dir, "final_report_with_p_1.md")
 
-
-# Helper function to load CSV files from a given pattern
-def load_csv_files(pattern):
+# Helper function to load CSV files
+def load_csv_files(pattern, is_seed_file=False):
     files = glob.glob(pattern)
     dfs = []
     for f in files:
         try:
             df = pd.read_csv(f)
-            df['source_file'] = os.path.basename(f)
+            if is_seed_file:
+                # Extract seed number from filenames like result_seed_1_original.csv
+                seed_part = os.path.basename(f).split("seed_")[1].split("_")[0]
+                df['seed'] = int(seed_part)
+            df['filename'] = os.path.basename(f)  # Use 'filename' instead of 'source_file'
             dfs.append(df)
         except Exception as e:
             print(f"Error reading {f}: {e}")
     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
+# Load individual seed results for Original CPA
+df_orig_seeds = load_csv_files(os.path.join(results_dir, "result_seed_*_original.csv"), is_seed_file=True)
+df_orig_seeds["config"] = "Original CPA"
 
-# Load aggregated results for Original CPA
-orig_pattern = os.path.join(results_dir, "result_experiment_original.csv")
-df_orig = load_csv_files(orig_pattern)
-df_orig["config"] = "Original CPA"
+# Load aggregated results for all Intense CPA configurations to find the best
+intense_agg_pattern = os.path.join(results_dir, "result_experiment_intense_*_*.csv")
+df_intense_agg = load_csv_files(intense_agg_pattern, is_seed_file=False)
 
-# Load aggregated results for all Intense CPA configurations (filenames include "intense")
-intense_pattern = os.path.join(results_dir, "result_experiment_*_*_*.csv")
-df_intense = load_csv_files(intense_pattern)
-df_intense = df_intense[df_intense['source_file'].str.contains("intense")].copy()
-
-
-# Function to extract configuration info from filename.
+# Function to extract configuration from aggregated filename
 def extract_config(fname):
-        try:
-            # Remove prefix and suffix, then split by underscore.
-            parts = fname.replace("result_experiment_", "").replace(".csv", "").split("_")
-            # Expecting format: ["intense", "<first_part>", "<second_part>", "<p_value>"]
-            if parts[0].lower() == "intense" and len(parts) >= 4:
-                reg_rate = parts[1] + "." + parts[2]
-                p_value = parts[3]
-                return f"Intense CPA (reg_rate={reg_rate}, p={p_value})"
-            else:
-                return "Intense CPA (unknown)"
-        except Exception as e:
-            return "Intense CPA (unknown)"
+    try:
+        parts = fname.replace("result_experiment_intense_", "").replace(".csv", "").split("_")
+        if len(parts) >= 3:  # Expecting at least [reg_rate_part1, reg_rate_part2, p]
+            reg_rate = f"{parts[0]}.{parts[1]}"
+            p_value = parts[2]
+            return f"Intense CPA (reg_rate={reg_rate}, p={p_value})"
+        return "Intense CPA (unknown)"
+    except Exception:
+        return "Intense CPA (unknown)"
 
+df_intense_agg["config"] = df_intense_agg["filename"].apply(extract_config)
 
-df_intense["config"] = df_intense["source_file"].apply(extract_config)
+# Find best Intense CPA config based on aggregated r2_mean_deg
+avg_scores = df_intense_agg.groupby("config")["r2_mean_deg"].mean().reset_index()
+best_intense_row = avg_scores.sort_values("r2_mean_deg", ascending=False).iloc[2]
+best_intense_config = best_intense_row["config"]
+best_intense_score = best_intense_row["r2_mean_deg"]
 
-# Combine both results
-df_all = pd.concat([df_orig, df_intense], ignore_index=True)
+# Extract reg_rate and p from best config
+reg_rate_str = best_intense_config.split("reg_rate=")[1].split(",")[0]
+p_str = best_intense_config.split("p=")[1].split(")")[0]
+reg_rate_formatted = reg_rate_str.replace(".", "_")
 
-# Compute average r2_mean_deg per configuration (overall, averaged over all rows)
-avg_scores = df_all.groupby("config")["r2_mean_deg"].mean().reset_index()
-# Select best Intense CPA configuration among intense ones
-intense_avg = avg_scores[avg_scores["config"].str.contains("Intense")]
-original_avg = avg_scores[avg_scores["config"].str.contains("Original")]
-if not intense_avg.empty:
-    best_intense_row = intense_avg.loc[intense_avg["r2_mean_deg"].idxmax()]
-    best_intense_config = best_intense_row["config"]
-    best_intense_score = best_intense_row["r2_mean_deg"]
-else:
-    best_intense_config = None
-    best_intense_score = None
+# Load individual seed results for best Intense CPA
+df_intense_seeds = load_csv_files(
+    os.path.join(results_dir, f"result_seed_*_intense_{reg_rate_formatted}_{p_str}.csv"),
+    is_seed_file=True
+)
+df_intense_seeds["config"] = best_intense_config
 
-if best_intense_config is None:
-    raise ValueError("No Intense CPA configuration found.")
+# Combine seed data
+df_all_seeds = pd.concat([df_orig_seeds, df_intense_seeds], ignore_index=True)
 
-# Separate results into In-distribution and OOD.
-# Here we assume that OOD conditions are labeled as "DUSP9+ETS2" or "CBL+CNN1"
+# Separate into In-distribution and OOD
 ood_conditions = {"DUSP9+ETS2", "CBL+CNN1"}
-df_in_dist = df_all[~df_all["condition"].isin(ood_conditions)].copy()
-df_ood = df_all[df_all["condition"].isin(ood_conditions)].copy()
+df_in_dist_seeds = df_all_seeds[~df_all_seeds["condition"].isin(ood_conditions)].copy()
+df_ood_seeds = df_all_seeds[df_all_seeds["condition"].isin(ood_conditions)].copy()
 
-
-# Function to build summary table comparing Original and best Intense CPA for each n_top_deg
+# Function to build comparison table with mean and std
 def build_comparison_table(df):
-    # Group by configuration and n_top_deg, computing mean metrics
     grouped = df.groupby(["config", "n_top_deg"]).agg({
-        "r2_mean_deg": "mean",
-        "r2_mean_lfc_deg": "mean"
+        "r2_mean_deg": ["mean", "std"],
+        "r2_mean_lfc_deg": ["mean", "std"]
     }).reset_index()
+    grouped.columns = ['_'.join(col).strip() if col[1] else col[0] for col in grouped.columns.values]
 
-    # Extract summaries for Original CPA and best intense configuration
     summary_orig = grouped[grouped["config"] == "Original CPA"].set_index("n_top_deg")
     summary_intense = grouped[grouped["config"] == best_intense_config].set_index("n_top_deg")
 
-    # Use common n_top_deg values
     common_n_top = sorted(set(summary_orig.index) & set(summary_intense.index))
 
     table_rows = []
     for n in common_n_top:
-        orig_r2 = summary_orig.loc[n, "r2_mean_deg"]
-        intense_r2 = summary_intense.loc[n, "r2_mean_deg"]
-        orig_r2_lfc = summary_orig.loc[n, "r2_mean_lfc_deg"]
-        intense_r2_lfc = summary_intense.loc[n, "r2_mean_lfc_deg"]
+        orig_r2_mean = summary_orig.loc[n, "r2_mean_deg_mean"]
+        orig_r2_std = summary_orig.loc[n, "r2_mean_deg_std"]
+        intense_r2_mean = summary_intense.loc[n, "r2_mean_deg_mean"]
+        intense_r2_std = summary_intense.loc[n, "r2_mean_deg_std"]
 
-        # Highlight the higher metric using markdown bold syntax
-        r2_deg_orig_str = f"**{orig_r2:.3f}**" if orig_r2 > intense_r2 else f"{orig_r2:.3f}"
-        r2_deg_intense_str = f"**{intense_r2:.3f}**" if intense_r2 > orig_r2 else f"{intense_r2:.3f}"
+        orig_r2_lfc_mean = summary_orig.loc[n, "r2_mean_lfc_deg_mean"]
+        orig_r2_lfc_std = summary_orig.loc[n, "r2_mean_lfc_deg_std"]
+        intense_r2_lfc_mean = summary_intense.loc[n, "r2_mean_lfc_deg_mean"]
+        intense_r2_lfc_std = summary_intense.loc[n, "r2_mean_lfc_deg_std"]
 
-        r2_lfc_orig_str = f"**{orig_r2_lfc:.3f}**" if orig_r2_lfc > intense_r2_lfc else f"{orig_r2_lfc:.3f}"
-        r2_lfc_intense_str = f"**{intense_r2_lfc:.3f}**" if intense_r2_lfc > orig_r2_lfc else f"{intense_r2_lfc:.3f}"
+        r2_deg_orig_str = f"**{orig_r2_mean:.3f} ± {orig_r2_std:.3f}**" if orig_r2_mean > intense_r2_mean else f"{orig_r2_mean:.3f} ± {orig_r2_std:.3f}"
+        r2_deg_intense_str = f"**{intense_r2_mean:.3f} ± {intense_r2_std:.3f}**" if intense_r2_mean > orig_r2_mean else f"{intense_r2_mean:.3f} ± {intense_r2_std:.3f}"
+
+        r2_lfc_orig_str = f"**{orig_r2_lfc_mean:.3f} ± {orig_r2_lfc_std:.3f}**" if orig_r2_lfc_mean > intense_r2_lfc_mean else f"{orig_r2_lfc_mean:.3f} ± {orig_r2_lfc_std:.3f}"
+        r2_lfc_intense_str = f"**{intense_r2_lfc_mean:.3f} ± {intense_r2_lfc_std:.3f}**" if intense_r2_lfc_mean > orig_r2_lfc_mean else f"{intense_r2_lfc_mean:.3f} ± {intense_r2_lfc_std:.3f}"
 
         table_rows.append([n, r2_deg_orig_str, r2_deg_intense_str, r2_lfc_orig_str, r2_lfc_intense_str])
 
@@ -130,25 +118,20 @@ def build_comparison_table(df):
                "Original CPA r2_mean_lfc_deg", f"{best_intense_config} r2_mean_lfc_deg"]
     return tabulate(table_rows, headers=headers, tablefmt="pipe", stralign="center")
 
+# Build tables
+table_in_dist = build_comparison_table(df_in_dist_seeds)
+table_ood = build_comparison_table(df_ood_seeds)
 
-# Build tables for In-distribution and OOD conditions
-table_in_dist = build_comparison_table(df_in_dist)
-table_ood = build_comparison_table(df_ood)
-
-# Assume latent space visualization and training history images are saved at these paths (update as needed)
-# For Original CPA:
+# Visualization paths
 orig_latent_img = "Norman_Original/latent_after_cond_harm_seed_all.png"
 orig_train_img = "Norman_Original/history_seed_all.png"
-# For best Intense CPA:
-intense_latent_img = best_intense_config.replace(" ", "_").replace("(", "").replace(")", "").replace("=", "_").replace(
-    ",", "") + "/latent_after_cond_harm_seed_all.png"
-intense_train_img = best_intense_config.replace(" ", "_").replace("(", "").replace(")", "").replace("=", "_").replace(
-    ",", "") + "/history_seed_all.png"
+intense_latent_img = best_intense_config.replace(" ", "_").replace("(", "").replace(")", "").replace("=", "_").replace(",", "") + "/latent_after_cond_harm_seed_all.png"
+intense_train_img = best_intense_config.replace(" ", "_").replace("(", "").replace(")", "").replace("=", "_").replace(",", "") + "/history_seed_all.png"
 
-# Generate markdown report content
+# Generate markdown report
 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 report_lines = [
-    "# Final Comparative Report: Original CPA vs. Best Intense CPA",
+    "# Final Comparative Report: Original CPA vs. Best Intense CPA Config with p = 1",
     f"*Report generated on {now}*",
     "",
     "## 1. Experiment Overview",
@@ -156,7 +139,8 @@ report_lines = [
      "against an enhanced model that incorporates tensor fusion (termed \"Intense CPA\"). The goal was to assess the generalization "
      "capabilities of each model under in-distribution conditions (conditions seen during training) as well as out-of-distribution (OOD) "
      "conditions (unseen combinations and different dosages). For each configuration, experiments were run on 5 different seeds. Evaluation "
-     "metrics include the R² score for mean gene expression predictions (r2_mean_deg) and for log-fold change predictions (r2_mean_lfc_deg)."),
+     "metrics include the R² score for mean gene expression predictions (r2_mean_deg) and for log-fold change predictions (r2_mean_lfc_deg). "
+     "Values are reported as mean ± standard deviation across seeds."),
     "",
     "## 2. Best Intense CPA Settings",
     f"- **Selected Configuration:** {best_intense_config}",
@@ -164,8 +148,8 @@ report_lines = [
     "",
     "## 3. Quantitative Evaluation",
     "### 3.1 In-Distribution Evaluation",
-    "The table below shows, for various numbers of top differentially expressed genes (n_top_deg), the average R² metrics for "
-    "Original CPA and the best Intense CPA. The higher value for each metric is highlighted in **bold**.",
+    "The table below shows, for various numbers of top differentially expressed genes (n_top_deg), the average R² metrics ± standard deviation for "
+    "Original CPA and the best Intense CPA. The higher mean value for each metric is highlighted in **bold**.",
     "",
     table_in_dist,
     "",
@@ -196,24 +180,21 @@ report_lines = [
     "## 5. Discussion",
     (
         "The quantitative evaluation indicates that the enhanced Intense CPA configuration outperforms the Original CPA in several cases, "
-        "as reflected by higher average R² scores both in in-distribution and OOD conditions. The latent space visualizations further support "
-        "the notion that the enhanced model learns a more robust and separable embedding, which is critical for accurate prediction of cellular responses."),
+        "as reflected by higher average R² scores both in in-distribution and OOD conditions. The standard deviations provide insight into "
+        "the consistency of performance across seeds."),
     "",
     "## 6. Conclusion",
     (
         "Overall, the experimental results support the hypothesis that modeling higher-order interactions via tensor fusion "
-        "significantly improves the performance of CPA on the Norman 2019 dataset. The best Intense CPA configuration, as detailed above, "
-        "demonstrates better generalization on unseen conditions while maintaining strong performance on training conditions. Future work "
-        "will focus on further parameter tuning and testing on additional datasets."),
+        "significantly improves the performance of CPA on the Norman 2019 dataset."),
     "",
     "## 7. References",
     (
-        "Additional details regarding the experimental setup and evaluation metrics are available in the corresponding documentation. "
-        "This report summarizes the key findings for presentation purposes.")
+        "Additional details regarding the experimental setup and evaluation metrics are available in the corresponding documentation.")
 ]
 
 # Write the markdown report to file
 with open(report_file, "w") as f:
     f.write("\n".join(report_lines))
 
-print(f"Final comparative report generated and saved to: {report_file}")
+print(f"Final comparative report with standard deviations generated and saved to: {report_file}")
