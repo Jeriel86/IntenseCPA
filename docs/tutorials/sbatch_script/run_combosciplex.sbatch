@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --mem=128G              # Memory: 128 GB
+#SBATCH --mem=150G              # Memory: 128 GB
 #SBATCH -J Combo_Training       # Job name
 #SBATCH --mail-type=END,FAIL    # Email notifications
 #SBATCH -n 1                    # 1 task
 #SBATCH --cpus-per-task=4       # 8 CPU cores per task
 #SBATCH -N 1                    # 1 node
-#SBATCH --gpus=a30:2           # 1 Tesla A30 GPU
+#SBATCH --gpus=v100:2           # 1 Tesla A30 GPU
 #SBATCH --partition=gpuidle     # Target gpuidle partition
 #SBATCH --output=combosciplex_intense_%j.out     # Output file
 #SBATCH --error=combosciplex_intense_%j.err      # Error file
@@ -17,7 +17,7 @@ source /home/nmbiedou/miniconda3/etc/profile.d/conda.sh
 conda activate newcpa
 
 # Run your Python script
-srun python  /home/nmbiedou/Documents/cpa/docs/tutorials/combosciplex.py
+python  /home/nmbiedou/Documents/cpa/docs/tutorials/combosciplex.py
 
 # Deactivate Conda environment
 conda deactivate

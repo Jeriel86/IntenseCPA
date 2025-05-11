@@ -47,16 +47,16 @@ def setup_paths(current_dir, use_intense, seed, intense_reg_rate, intense_p):
     data_path = os.path.join(data_dir, "datasets", "combo_sciplex_prep_hvg_filtered.h5ad")
     if use_intense:
         save_path = os.path.join(
-            current_dir, "experiment/Combo_Order_2",
+            current_dir, "experiment/Combo_Order_3",
             f"combo_Intense_reg_{str(intense_reg_rate).replace('.', '_')}_p_{intense_p}_seed_{seed}"
         )
     else:
         save_path = os.path.join(
-            current_dir, "experiment/Combo_Order_2",
+            current_dir, "experiment/Combo_Order_3",
             f"combo_Original_seed_{seed}"
         )
     os.makedirs(save_path, exist_ok=True)
-    results_dir = os.path.join(current_dir, 'experiment/Combo_Order_2', 'experiment_results')
+    results_dir = os.path.join(current_dir, 'experiment/Combo_Order_3', 'experiment_results')
     os.makedirs(results_dir, exist_ok=True)
     log_file = os.path.join(results_dir, 'experiment_log.csv')
 
@@ -124,7 +124,7 @@ def setup_hparams(args):
         base_hparams.update({
             "use_intense": True,
             "intense_reg_rate": args.intense_reg_rate,
-            "interaction_order": 2,
+            "interaction_order": 3,
             "intense_p": args.intense_p
         })
         trainer_params = {
@@ -241,7 +241,7 @@ def main():
     # Plot training history
     history_plot_path = os.path.join(save_path, "history.png")
     cpa.pl.plot_history(model, history_plot_path)
-    results_dir = os.path.join(args.current_dir, 'experiment/Combo_Order_2', 'experiment_results')
+    results_dir = os.path.join(args.current_dir, 'experiment/Combo_Order_3', 'experiment_results')
     os.makedirs(results_dir, exist_ok=True)
 
     if args.use_intense:

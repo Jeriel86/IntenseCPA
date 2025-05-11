@@ -77,7 +77,7 @@ model_args = {
     'test_split': 'ood',
     'use_intense': True,
     "interaction_order": 2,
-    'intense_reg_rate': tune.loguniform(1e-3, 1e-1),
+    'intense_reg_rate': tune.loguniform(0.03, 0.06),
     'intense_p': tune.choice([1, 2])
 }
 
@@ -117,8 +117,8 @@ trainer_actual_args = {
     'max_epochs': 2000,
     'use_gpu': True,
     'check_val_every_n_epoch': 5,
-    'batch_size': tune.choice([128, 256, 512]),
-    'early_stopping_patience': tune.choice([5,10])
+    'batch_size': 512,
+    'early_stopping_patience': 5
 }
 train_args.update(trainer_actual_args)
 
@@ -130,8 +130,8 @@ search_space = {
 
 # Scheduler settings for ASHA
 scheduler_kwargs = {
-    'max_t': 200,
-    'grace_period': 5,
+    'max_t': 300,
+    'grace_period': 10,
     'reduction_factor': 3,
 }
 
@@ -153,7 +153,7 @@ model = cpa.CPA
 model.setup_anndata(adata, **setup_anndata_kwargs)
 # Resources to allocate pro trial
 resources = {
-    "cpu": 2,
+    "cpu": 4,
     "gpu": 2,
     "memory": 70 * 1024 * 1024 * 1024  # 183 GiB
 }
@@ -176,19 +176,19 @@ experiment = run_autotune(
     searcher="hyperopt",
     seed=1,
     resources=resources,
-    experiment_name="cpa_kang_tune_main",
+    experiment_name="cpa_kang_tune_exploration",
     logging_dir=LOGGING_DIR,
     adata_path=PREPROCESSED_DATA_PATH,  # Use preprocessed data path
     sub_sample=None,
     setup_anndata_kwargs=setup_anndata_kwargs,
     use_wandb=True,
-    wandb_name="cpa_kang_tune_main",
+    wandb_name="cpa_kang_tune_exploration",
     scheduler_kwargs=scheduler_kwargs,
     plan_kwargs_keys=plan_kwargs_keys,
 )
 
 # Save results
 result_grid = experiment.result_grid
-print(result_grid.get_best_result())
+print(result_grid.get_best_result(metric="cpa_metric", mode="max"))
 with open(os.path.join(PROJECT_ROOT, 'result_grid.pkl'), 'wb') as f:
     pickle.dump(result_grid, f)

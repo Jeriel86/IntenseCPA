@@ -75,9 +75,8 @@ model_args = {
     'valid_split': 'valid',
     'test_split': 'ood',
     'use_intense': True,
-    "use_rite": False,
-    "interaction_order": tune.choice([2, 3]),
-    'intense_reg_rate': tune.loguniform(1e-3, 1e-1),
+    "interaction_order": 2,
+    'intense_reg_rate': tune.loguniform(0.04, 0.09),
     'intense_p': tune.choice([1, 2])
 }
 
@@ -116,9 +115,9 @@ plan_kwargs_keys = list(train_args.keys())
 trainer_actual_args = {
     'max_epochs': 2000,
     'use_gpu': True,
-    'early_stopping_patience': 10,
+    'early_stopping_patience': 5,
     'check_val_every_n_epoch': 5,
-    'batch_size': 128
+    'batch_size': 512
 }
 train_args.update(trainer_actual_args)
 
@@ -156,7 +155,7 @@ model.setup_anndata(adata, **setup_anndata_kwargs)
 resources = {
     "cpu": 10,
     "gpu":2,
-    "memory": 80 * 1024 * 1024 * 1024  # 183 GiB
+    "memory": 70 * 1024 * 1024 * 1024  # 183 GiB
 }
 
 if _original_cuda_visible_devices is not None:
@@ -165,14 +164,14 @@ else:
     os.environ.pop("CUDA_VISIBLE_DEVICES", None)
 
 # Run hyperparameter tuning
-EXPERIMENT_NAME = "cpa_autotune_combo_1104"
+EXPERIMENT_NAME = "cpa_autotune_combo_final"
 experiment = run_autotune(
         model_cls=model,
         data=adata,
         metrics=["cpa_metric", "disnt_basal", "disnt_after", "r2_mean", "val_r2_mean", "val_r2_var", "val_recon"],
         mode="max",
         search_space=search_space,
-        num_samples=200,
+        num_samples=100,
         scheduler="asha",
         searcher="hyperopt",
         seed=1,
@@ -183,7 +182,7 @@ experiment = run_autotune(
         sub_sample=None,
         setup_anndata_kwargs=setup_anndata_kwargs,
         use_wandb=True,
-        wandb_name="cpa_tune_combo_1104",
+        wandb_name="cpa_tune_combo_final",
         scheduler_kwargs=scheduler_kwargs,
         plan_kwargs_keys=plan_kwargs_keys,
     )

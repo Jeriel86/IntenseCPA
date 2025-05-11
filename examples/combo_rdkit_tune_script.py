@@ -110,7 +110,7 @@ plan_kwargs_keys = list(train_args.keys())
 trainer_actual_args = {
     'max_epochs': 2000,
     'use_gpu': True,
-    'early_stopping_patience':  10,
+    'early_stopping_patience': tune.choice([5, 10, 15]),
     'check_val_every_n_epoch': 5,
     'batch_size': 512,
 }
@@ -124,7 +124,7 @@ search_space = {
 
 # Scheduler settings for ASHA
 scheduler_kwargs = {
-    'max_t': 1000,
+    'max_t': 500,
     'grace_period': 5,
     'reduction_factor': 3,
 }
