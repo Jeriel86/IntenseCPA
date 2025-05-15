@@ -117,30 +117,30 @@ if args.use_intense:
         "intense_p": args.intense_p
     }
     trainer_params = {
-        "n_epochs_adv_warmup": 0,
+        "n_epochs_adv_warmup": 10,
         "n_epochs_kl_warmup": None,
         "n_epochs_pretrain_ae": 5,
-        "adv_steps": 2,
-        "mixup_alpha": 0.3,
-        "n_epochs_mixup_warmup": 3,
-        "n_layers_adv": 1,
+        "adv_steps": 3,
+        "mixup_alpha": 0,
+        "n_epochs_mixup_warmup": 0,
+        "n_layers_adv": 2,
         "n_hidden_adv": 64,
-        "use_batch_norm_adv": False,
-        "use_layer_norm_adv": True,
-        "dropout_rate_adv": 0.25,
-        "pen_adv": 0.8543559662702802,
-        "reg_adv": 1.0525942325413844,
-        "lr": 0.00020036683900918832,
-        "wd": 0.00000002740420231004,
-        "doser_lr": 0.0001808693526310397,
-        "doser_wd": 0.00000003445532526714,
-        "adv_lr": 0.0011418884883605857,
-        "adv_wd": 0.00000559869643135145,
+        "use_batch_norm_adv": True,
+        "use_layer_norm_adv": False,
+        "dropout_rate_adv": 0.1,
+        "pen_adv": 1.2275890306102464,
+        "reg_adv": 7.635346541535559,
+        "lr": 0.0003916534682803787,
+        "wd": 5.985138372921983e-7,
+        "doser_lr": 0.0004576703731531967,
+        "doser_wd": 0.000007034097484816466,
+        "adv_lr": 0.00033486219722040055,
+        "adv_wd": 1.8820406393812192e-8,
         "adv_loss": "cce",
         "do_clip_grad": False,
         "gradient_clip_value": 1,
-        "step_size_lr": 45,
-        "momentum": 0.3034310866721415
+        "step_size_lr": 15,
+        "momentum": 0.4633125728242274
     }
 else:
     model_params = {
