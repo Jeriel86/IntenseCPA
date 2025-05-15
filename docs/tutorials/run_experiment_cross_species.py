@@ -13,7 +13,7 @@ import time
 import cpa
 import scanpy as sc
 
-from docs.tutorials.utils import append_to_csv
+from docs.tutorials.utils import append_to_csv, measure_training_pl, measure_inference_pl
 
 # --- Argument Parser ---
 parser = argparse.ArgumentParser(description="Run a single CPA experiment")
@@ -198,8 +198,13 @@ model = cpa.CPA(
     **model_params,
 )
 
-# --- Training CPA ---
-model.train(
+# -----------------------
+# Profiling: Training
+# -----------------------
+print("Profiling training...")
+
+train_time, train_mem = measure_training_pl(
+    model.train,
     max_epochs=2000,
     use_gpu=True,
     batch_size=512,
@@ -208,18 +213,47 @@ model.train(
     check_val_every_n_epoch=5,
     save_path=save_path,
 )
+print(f"Training completed in {train_time:.2f}s, peak GPU memory: {train_mem / 1e9:.2f} GB")
 
+# -----------------------
+# Profiling: Inference
+# -----------------------
+print("Profiling inference...")
+inf_time, inf_tp, inf_mem, latent_outputs = measure_inference_pl(
+    model,
+    adata,
+    batch_size=2048
+)
+print(f"Inference completed in {inf_time:.2f}s, throughput: {inf_tp:.2f} samples/s, peak GPU memory: {inf_mem / 1e9:.2f} GB")
+
+# -----------------------
+# Save timing & memory metrics
+# -----------------------
+metrics_file = os.path.join(os.path.dirname(log_file), 'time_memory_metrics.csv')
+metrics_entry = {
+    'task_id': task_id,
+    'use_intense': args.use_intense,
+    'intense_reg_rate': args.intense_reg_rate if args.use_intense else None,
+    'intense_p': args.intense_p if args.use_intense else None,
+    'seed': args.seed,
+    'train_time_s': train_time,
+    'inf_time_s': inf_time,
+    'inf_tp_s': inf_tp,
+    'train_mem_GB': train_mem / 1e9,
+    'inf_mem_GB': inf_mem / 1e9,
+}
+append_to_csv(metrics_entry, metrics_file)
+print(f"Metrics saved to {metrics_file}")
+
+# Plot training history
 plot_path = os.path.join(save_path, "history.png")
 cpa.pl.plot_history(model, plot_path)
 
 if args.use_intense:
-    #plot_path_scores = os.path.join(save_path, "scores.png")
-    #cpa.pl.plot_relevance_scores(model.module.intense_fusion.mkl_fusion, plot_path_scores)
     scores = model.module.intense_fusion.mkl_fusion.scores()
     scores_file = os.path.join(results_dir, f'scores_reg_{str(args.intense_reg_rate).replace(".", "_")}_p_{args.intense_p}.csv')
     append_to_csv(scores,scores_file)
 # --- Latent Space Visualization ---
-latent_outputs = model.get_latent_representation(adata, batch_size=2048)
 
 # Basal latent space
 sc.pp.neighbors(latent_outputs['latent_basal'])
