@@ -86,7 +86,7 @@ cpa.CPA.setup_anndata(
     perturbation_key='condition',
     control_group='control',
     dosage_key='dose_val',
-    categorical_covariate_keys=['cell_type'],
+    categorical_covariate_keys=['species'],
     is_count_data=True,
     deg_uns_key='rank_genes_groups_cov',
     deg_uns_cat_key='cov_drug_dose_name',
@@ -96,19 +96,19 @@ cpa.CPA.setup_anndata(
 # --- CPA Model Parameters ---
 if args.use_intense:
     model_params = {
-        "n_latent": 64,
+        "n_latent": 256,
         "recon_loss": "nb",
-        "doser_type": "linear",
-        "n_hidden_encoder": 128,
-        "n_layers_encoder": 2,
-        "n_hidden_decoder": 512,
+        "doser_type": "logsigm",
+        "n_hidden_encoder": 256,
+        "n_layers_encoder": 3,
+        "n_hidden_decoder": 128,
         "n_layers_decoder": 2,
-        "use_batch_norm_encoder": True,
+        "use_batch_norm_encoder": False,
         "use_layer_norm_encoder": False,
         "use_batch_norm_decoder": False,
         "use_layer_norm_decoder": True,
-        "dropout_rate_encoder": 0.0,
-        "dropout_rate_decoder": 0.1,
+        "dropout_rate_encoder": 0.25,
+        "dropout_rate_decoder": 0.0,
         "variational": False,
         "seed": args.seed,
         "use_intense": True,
@@ -158,7 +158,7 @@ else:
         "dropout_rate_encoder": 0.25,
         "dropout_rate_decoder": 0.0,
         "variational": False,
-        "seed": 3303,
+        "seed": args.seed,
         "use_intense": False
     }
 
@@ -226,7 +226,7 @@ sc.pp.neighbors(latent_outputs['latent_basal'])
 sc.tl.umap(latent_outputs['latent_basal'])
 sc.pl.umap(
     latent_outputs['latent_basal'],
-    color=['condition', 'cell_type'],
+    color=['condition', 'species'],
     frameon=False,
     wspace=0.3,
     save=f'latent_basal_seed_{args.seed}.png',
@@ -238,7 +238,7 @@ sc.pp.neighbors(latent_outputs['latent_after'])
 sc.tl.umap(latent_outputs['latent_after'])
 sc.pl.umap(
     latent_outputs['latent_after'],
-    color=['condition', 'cell_type'],
+    color=['condition', 'species'],
     frameon=False,
     wspace=0.3,
     save=f'latent_after_seed_{args.seed}.png',
@@ -246,22 +246,21 @@ sc.pl.umap(
 )
 
 # --- Evaluation ---
-"""model.predict(adata, batch_size=2048)
-n_top_degs = [10, 20, 50, None]
-results = defaultdict(list)
+model.predict(adata, batch_size=2048)
+n_top_degs = [10, 20, 50, None]  # None means all genes
 
+results = defaultdict(list)
+ctrl_adata = adata[(adata.obs['condition'] == 'unst') & (adata.obs['dose_val'] == 1.0)].copy()
 for cat in tqdm(adata.obs['cov_drug_dose_name'].unique()):
-    if 'control' not in cat:
-        cov, condition = cat.split('_')
+    if 'unst_1.0' not in cat:
         cat_adata = adata[adata.obs['cov_drug_dose_name'] == cat].copy()
-        ctrl_adata = adata[adata.obs['cov_drug_dose_name'] == f'{cov}_ctrl'].copy()
 
         deg_cat = f'{cat}'
         deg_list = adata.uns['rank_genes_groups_cov'][deg_cat]
 
-        x_true = cat_adata.layers['counts']
+        x_true = cat_adata.layers['counts'].toarray()
         x_pred = cat_adata.obsm['CPA_pred']
-        x_ctrl = ctrl_adata.layers['counts']
+        x_ctrl = ctrl_adata.layers['counts'].toarray()
 
         x_true = np.log1p(x_true)
         x_pred = np.log1p(x_pred)
@@ -283,8 +282,11 @@ for cat in tqdm(adata.obs['cov_drug_dose_name'].unique()):
             r2_mean_lfc_deg = r2_score(x_true_deg.mean(0) - x_ctrl_deg.mean(0), x_pred_deg.mean(0) - x_ctrl_deg.mean(0))
             r2_var_lfc_deg = r2_score(x_true_deg.var(0) - x_ctrl_deg.var(0), x_pred_deg.var(0) - x_ctrl_deg.var(0))
 
-            results['condition'].append(condition)
-            results['cell_type'].append(cov)
+            cov, cond, dose = cat.split('_')
+
+            results['species'].append(cov)
+            results['condition'].append(cond)
+            results['dose'].append(dose)
             results['n_top_deg'].append(n_top_deg)
             results['r2_mean_deg'].append(r2_mean_deg)
             results['r2_var_deg'].append(r2_var_deg)
@@ -302,4 +304,3 @@ if args.use_intense:
 else:
     result_file = os.path.join(results_dir, f'result_seed_{args.seed}_original.csv')
 df.to_csv(result_file, index=False)
-"""
