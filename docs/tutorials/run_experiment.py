@@ -213,8 +213,6 @@ plot_path = os.path.join(save_path, "history.png")
 cpa.pl.plot_history(model, plot_path)
 
 if args.use_intense:
-    #plot_path_scores = os.path.join(save_path, "scores.png")
-    #cpa.pl.plot_relevance_scores(model.module.intense_fusion.mkl_fusion, plot_path_scores)
     scores = model.module.intense_fusion.mkl_fusion.scores()
     scores_file = os.path.join(results_dir, f'scores_reg_{str(args.intense_reg_rate).replace(".", "_")}_p_{args.intense_p}.csv')
     append_to_csv(scores,scores_file)
