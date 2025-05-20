@@ -10,7 +10,7 @@ from torch.distributions import Normal
 from torch.distributions.kl import kl_divergence as kl
 from torchmetrics.functional import accuracy, pearson_corrcoef, r2_score
 
-from ._intense import InTense
+from ._intense2 import InTense
 from ._metrics import knn_purity
 from ._utils import PerturbationNetwork, VanillaEncoder, CPA_REGISTRY_KEYS
 
@@ -92,6 +92,7 @@ class CPAModule(BaseModuleClass):
                  intense_reg_rate: float = 0.01,
                  intense_p: int = 1,
                  interaction_order: int = 3,
+                 tf_latent_dim: Optional[int] = None,
                  ):
         super().__init__()
 
@@ -113,6 +114,7 @@ class CPAModule(BaseModuleClass):
         self.use_intense = use_intense
 
         if self.use_intense:
+            base = tf_latent_dim or n_latent
             dim_dict_single = {
                 "1": n_latent,
                 "2": n_latent,
@@ -120,10 +122,10 @@ class CPAModule(BaseModuleClass):
             }
 
             feature_dim_dict_triple = {
-                "12": n_latent * n_latent,  # e.g. "basal⊗pert"
-                "13": n_latent * n_latent,  # e.g. "basal⊗covar"
-                "23": n_latent * n_latent,  # e.g. "pert⊗covar"
-                "123": n_latent * n_latent * n_latent  # e.g. "basal⊗pert⊗covar"
+                "12": base * base,  # e.g. "basal⊗pert"
+                "13": base * base,  # e.g. "basal⊗covar"
+                "23": base * base,  # e.g. "pert⊗covar"
+                "123": base * base * base  # e.g. "basal⊗pert⊗covar"
             }
 
             # Then build an InTense module:
@@ -133,8 +135,9 @@ class CPAModule(BaseModuleClass):
                 track_running_stats=True,
                 out_features=n_latent,  # final output dimension = n_latent
                 intense_reg_rate=intense_reg_rate,
-                intense_p= intense_p,
-                interaction_order=interaction_order
+                intense_p=intense_p,
+                interaction_order=interaction_order,
+                tf_latent_dim=tf_latent_dim,
             )
 
         if variational:
@@ -320,10 +323,10 @@ class CPAModule(BaseModuleClass):
         z_covs_wo_batch = torch.zeros_like(z_basal)  # ([n_samples,] batch_size, n_latent)
 
         batch_key = CPA_REGISTRY_KEYS.BATCH_KEY
-        
+
         if covars_to_add is None:
             covars_to_add = list(self.covars_encoder.keys())
-            
+
         for covar, encoder in self.covars_encoder.items():
             if covar in covars_to_add:
                 z_cov = self.covars_embeddings[covar](covars_dict[covar].long())
@@ -332,7 +335,7 @@ class CPAModule(BaseModuleClass):
                     z_cov = mixup_lambda * z_cov + (1. - mixup_lambda) * z_cov_mixup
                 z_cov = z_cov.view(batch_size, self.n_latent)  # batch_size, n_latent
                 z_covs += z_cov
-                
+
                 if covar != batch_key:
                     z_covs_wo_batch += z_cov
         if self.use_intense:
@@ -349,21 +352,21 @@ class CPAModule(BaseModuleClass):
         z_no_pert_corrected = z_basal + z_covs_wo_batch
 
         return dict(
-                z=z,
-                z_corrected=z_corrected,
-                z_no_pert=z_no_pert,
-                z_no_pert_corrected=z_no_pert_corrected,
-                z_basal=z_basal,
-                z_covs=z_covs,
-                z_pert=z_pert.sum(dim=1),
-                library=library,
-                qz=qz,
-                mixup_lambda=mixup_lambda,
-            )
+            z=z,
+            z_corrected=z_corrected,
+            z_no_pert=z_no_pert,
+            z_no_pert_corrected=z_no_pert_corrected,
+            z_basal=z_basal,
+            z_covs=z_covs,
+            z_pert=z_pert.sum(dim=1),
+            library=library,
+            qz=qz,
+            mixup_lambda=mixup_lambda,
+        )
 
     def _get_generative_input(self, tensors, inference_outputs, **kwargs):
         if 'latent' in kwargs.keys():
-            if kwargs['latent'] in inference_outputs.keys(): # z, z_corrected, z_no_pert, z_no_pert_corrected, z_basal
+            if kwargs['latent'] in inference_outputs.keys():  # z, z_corrected, z_no_pert, z_no_pert_corrected, z_basal
                 z = inference_outputs[kwargs['latent']]
             else:
                 raise Exception('Invalid latent space')
@@ -420,7 +423,7 @@ class CPAModule(BaseModuleClass):
             kl_loss = torch.zeros_like(recon_loss)
         if self.use_intense:
             intense_reg = self.intense_fusion.get_regularizer()
-            return (recon_loss+intense_reg), kl_loss, intense_reg
+            return (recon_loss + intense_reg), kl_loss, intense_reg
 
         return recon_loss, kl_loss
 
@@ -429,7 +432,7 @@ class CPAModule(BaseModuleClass):
         assert mode in ['direct']
 
         x = tensors[CPA_REGISTRY_KEYS.X_KEY]  # batch_size, n_genes
-        indices = tensors[CPA_REGISTRY_KEYS.CATEGORY_KEY].view(-1,)
+        indices = tensors[CPA_REGISTRY_KEYS.CATEGORY_KEY].view(-1, )
 
         unique_indices = indices.unique()
 
@@ -456,9 +459,9 @@ class CPAModule(BaseModuleClass):
                 x_pred_var = torch.nan_to_num(x_pred_var, nan=0, posinf=1e3, neginf=-1e3)
 
                 r2_mean += torch.nan_to_num(self.metrics['r2_score'](x_pred_mean.mean(0), x_i.mean(0)),
-                                        nan=0.0).item()
+                                            nan=0.0).item()
                 r2_var += torch.nan_to_num(self.metrics['r2_score'](x_pred_var.mean(0), x_i.var(0)),
-                                        nan=0.0).item()
+                                           nan=0.0).item()
 
             elif self.recon_loss in ['nb', 'zinb']:
                 x_i = torch.log(1 + x_i)
@@ -474,9 +477,9 @@ class CPAModule(BaseModuleClass):
                     x_pred *= deg_mask
 
                 r2_mean += torch.nan_to_num(self.metrics['r2_score'](x_pred.mean(0), x_i.mean(0)),
-                                        nan=0.0).item()
+                                            nan=0.0).item()
                 r2_var += torch.nan_to_num(self.metrics['r2_score'](x_pred.var(0), x_i.var(0)),
-                                        nan=0.0).item()
+                                           nan=0.0).item()
 
         n_unique_indices = len(unique_indices)
         return r2_mean / n_unique_indices, r2_var / n_unique_indices
