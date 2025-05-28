@@ -274,7 +274,18 @@ def main():
 
             all_results.append(metrics)
 
-    # Create DataFrame and average per config
+
+        # Create DataFrame and average per config
+        df = pd.DataFrame(all_results)
+        # Compute mean and standard deviation per metric per model configuration
+        stats = df.groupby('model').agg(['mean', 'std'])
+        # Flatten multiindex columns: e.g. r2_mean_all_mean, r2_mean_all_std
+        stats.columns = ['_'.join([metric, stat]) for metric, stat in stats.columns]
+        df_stats = stats.reset_index()
+        # Save statistics
+        stats_csv = os.path.join(args.output_dir, "comparison_metrics_stats.csv")
+        df_stats.to_csv(stats_csv, index=False)
+        print(f"Saved mean and std of metrics per model config to {stats_csv}")
 
 
 if __name__ == '__main__':
