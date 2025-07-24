@@ -39,13 +39,13 @@ import scanpy as sc
 # --- Setting up environment ---
 
 # Print and change current directory
-print("Current directory:", os.getcwd())
-os.chdir("../..")  # Adjust this based on your starting directory
-print("New directory:", os.getcwd())
-current_dir = os.getcwd()
+#print("Current directory:", os.getcwd())
+#os.chdir("../..")  # Adjust this based on your starting directory
+#print("New directory:", os.getcwd())
+current_dir = "/home/nmbiedou/Documents/cpa"
 
 # Uncomment to set GPU visibility
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5'
 
 # Set Scanpy figure parameters
 sc.settings.set_figure_params(dpi=100)
@@ -54,7 +54,7 @@ sc.settings.set_figure_params(dpi=100)
 data_path = os.path.join(current_dir, "datasets", "kang_normalized_hvg.h5ad")
 
 # Define save path for the results(model, images, csv)
-save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_SGD_Optimized')
+save_path = os.path.join(current_dir, 'lightning_logs', 'Kang_Intense_SGD_Optimized_2203')
 
 # --- Loading dataset ---
 
@@ -81,6 +81,7 @@ print(adata.obs['cell_type'].value_counts())
 print(adata.obs['condition'].value_counts())
 
 # Set up AnnData for CPA
+
 cpa.CPA.setup_anndata(
     adata,
     perturbation_key='condition',
@@ -94,98 +95,51 @@ cpa.CPA.setup_anndata(
 )
 
 # --- CPA Model Parameters ---
-
-"""model_params = {
-    "n_latent": 32,
-    "recon_loss": "nb",
-    "doser_type": "logsigm",
-    "n_hidden_encoder": 256,
-    "n_layers_encoder": 2,
-    "n_hidden_decoder": 1024,
-    "n_layers_decoder": 5,
-    "use_batch_norm_encoder": False,
-    "use_layer_norm_encoder": False,
-    "use_batch_norm_decoder": True,
-    "use_layer_norm_decoder": False,
-    "dropout_rate_encoder": 0.1,
-    "dropout_rate_decoder": 0.1,
-    "variational": False,
-    "seed": 6484,
-    "use_intense": True,
-    "intense_reg_rate": 0.001
-}
-
-trainer_params = {
-    "n_epochs_kl_warmup": None,
-    "n_epochs_pretrain_ae": 30,
-    "n_epochs_adv_warmup": 0,
-    "n_epochs_mixup_warmup": 1,
-    "mixup_alpha": 0.2,
-    "adv_steps": 5,
-    "n_hidden_adv": 64,
-    "n_layers_adv": 5,
-    "use_batch_norm_adv": False,
-    "use_layer_norm_adv": True,
-    "dropout_rate_adv": 0.0,
-    "reg_adv": 0.3152968735442255,
-    "pen_adv": 2.1970499016525586,
-    "lr": 0.00012682070910272034,
-    "wd": 4.142396520679187e-08,
-    "adv_lr": 0.007563368608355524,
-    "adv_wd": 9.121412021869953e-07,
-    "adv_loss": "cce",
-    "doser_lr": 9.264371170111658e-05,
-    "doser_wd": 4.735944038837636e-06,
-    "do_clip_grad": True,
-    "gradient_clip_value": 1.0,
-    "step_size_lr": 10
-}
-"""
-#### new from heute cpa_metric 2.56
 model_params = {
-    "n_latent": 64,
-    "recon_loss": "nb",
-    "doser_type": "logsigm",
-    "n_hidden_encoder": 512,
-    "n_layers_encoder": 5,
-    "n_hidden_decoder": 256,
-    "n_layers_decoder": 2,
-    "use_batch_norm_encoder": False,
-    "use_layer_norm_encoder": True,
-    "use_batch_norm_decoder": True,
-    "use_layer_norm_decoder": False,
-    "dropout_rate_encoder": 0.2,
-    "dropout_rate_decoder": 0.0,
-    "variational": False,
-    "seed": 6525,
-    "use_intense": True,
-    "intense_reg_rate": 0.1
+    "n_latent": 64,                    # Updated from model_args
+    "recon_loss": "nb",                # Updated from model_args
+    "doser_type": "linear",            # Updated from model_args
+    "n_hidden_encoder": 128,           # Updated from model_args
+    "n_layers_encoder": 2,             # Updated from model_args
+    "n_hidden_decoder": 512,           # Updated from model_args
+    "n_layers_decoder": 2,             # Updated from model_args
+    "use_batch_norm_encoder": True,    # Updated from model_args
+    "use_layer_norm_encoder": False,   # Updated from model_args
+    "use_batch_norm_decoder": False,   # Updated from model_args
+    "use_layer_norm_decoder": True,    # Updated from model_args
+    "dropout_rate_encoder": 0.0,       # Updated from model_args
+    "dropout_rate_decoder": 0.1,       # Updated from model_args
+    "variational": False,              # Updated from model_args
+    "seed": 6977,                      # Updated from model_args (6,977 interpreted as 6977)
+    "use_intense": True,               # Updated from model_args
+    "intense_reg_rate": 0.5,           # Updated from model_args
+    "intense_p": 2                     # Updated from model_args
 }
 
 trainer_params = {
-    "n_epochs_adv_warmup": 3,
-    "n_epochs_kl_warmup": None,
-    "n_epochs_pretrain_ae": 50,
-    "adv_steps": 5,
-    "mixup_alpha": 0.3,
-    "n_epochs_mixup_warmup": 10,
-    "n_layers_adv": 2,
-    "n_hidden_adv": 64,
-    "use_batch_norm_adv": False,
-    "use_layer_norm_adv": False,
-    "dropout_rate_adv": 0.0,
-    "pen_adv": 0.1995431254447313,
-    "reg_adv": 6.1902932390831324,
-    "lr": 0.0007064775779032066,
-    "wd": 1.175555699588592e-07,
-    "doser_lr": 2.3211621010467742e-05,
-    "doser_wd": 1.2484610680888827e-07,
-    "adv_lr": 0.003224233031630511,
-    "adv_wd": 1.6809347701585555e-08,
-    "adv_loss": "cce",
-    "do_clip_grad": False,
-    "gradient_clip_value": 1.0,
-    "step_size_lr": 10,
+    "n_epochs_adv_warmup": 1,          # Updated from model_args
+    "n_epochs_kl_warmup": None,        # Updated from model_args (null)
+    "n_epochs_pretrain_ae": 3,         # Updated from model_args
+    "adv_steps": 20,                   # Updated from model_args
+    "mixup_alpha": 0.5,                # Updated from model_args
+    "n_epochs_mixup_warmup": 1,        # Updated from model_args
+    "n_layers_adv": 2,                 # Updated from model_args
+    "n_hidden_adv": 128,               # Updated from model_args
+    "use_batch_norm_adv": True,        # Updated from model_args
+    "use_layer_norm_adv": False,       # Updated from model_args
+    "dropout_rate_adv": 0.3,           # Updated from model_args
+    "pen_adv": 0.06586477769085837,    # Updated from model_args
+    "reg_adv": 25.915240512217768,     # Updated from model_args
+    "lr": 0.00031846009054514735,      # Updated from model_args
+    "wd": 0.00000001297631322054,      # Updated from model_args
+    "doser_lr": 0.0011680586429996507, # Updated from model_args
+    "doser_wd": 0.00000250280215373454,# Updated from model_args
+    "adv_lr": 0.00001758762700595009,  # Updated from model_args
+    "adv_wd": 0.00000007470316045061,  # Updated from model_args
+    "adv_loss": "cce",                 # Updated from model_args
+    "do_clip_grad": False,             # Updated from model_args
+    "gradient_clip_value": 1,          # Updated from model_args
+    "step_size_lr": 45,                # Updated from model_args
 }
 # --- Creating CPA Model ---
 
@@ -208,7 +162,8 @@ model.train(
     plan_kwargs=trainer_params,
     early_stopping_patience=10,
     check_val_every_n_epoch=5,
-    save_path=save_path
+    save_path=save_path,
+    num_gpus=8
 )
 
 plot_path = os.path.join(save_path, "history.png")
@@ -226,30 +181,39 @@ cpa.pl.plot_history(model,plot_path)
 
 # Get latent representations
 latent_outputs = model.get_latent_representation(adata, batch_size=2048)
-print(latent_outputs.keys())
+#print(latent_outputs.keys())
 
 # Basal latent space
-#sc.pp.neighbors(latent_outputs['latent_basal'])
-#sc.tl.umap(latent_outputs['latent_basal'])
-#sc.pl.umap(
-#    latent_outputs['latent_basal'],
-#    color=['condition', 'cell_type'],
-#    frameon=False,
-#    wspace=0.3,
-#    save='latent_basal.png'  # Saves the plot as a file
-#)
+sc.pp.neighbors(latent_outputs['latent_basal'])
+sc.tl.umap(latent_outputs['latent_basal'])
+sc.pl.umap(
+    latent_outputs['latent_basal'],
+    color=['condition', 'cell_type'],
+    frameon=False,
+    wspace=0.3,
+    save='latent_basal_2203_2.png'  # Saves the plot as a file
+)
+
+os.rename(
+    os.path.join(sc.settings.figdir, f'umaplatent_basal_2203_2.png'),
+    os.path.join(save_path, f'latent_basal_2203_2.png')
+)
+
 
 # Final latent space (after condition and cell_type embeddings)
-#sc.pp.neighbors(latent_outputs['latent_after'])
-#sc.tl.umap(latent_outputs['latent_after'])
-#sc.pl.umap(
-#    latent_outputs['latent_after'],
-#    color=['condition', 'cell_type'],
-#    frameon=False,
-#    wspace=0.3,
-#    save='latent_after.png'  # Saves the plot as a file
-#)
-
+sc.pp.neighbors(latent_outputs['latent_after'])
+sc.tl.umap(latent_outputs['latent_after'])
+sc.pl.umap(
+    latent_outputs['latent_after'],
+    color=['condition', 'cell_type'],
+    frameon=False,
+    wspace=0.3,
+    save='latent_after_2203_22.png'  # Saves the plot as a file
+)
+os.rename(
+    os.path.join(sc.settings.figdir, f'umaplatent_after_2203_2.png'),
+    os.path.join(save_path, f'latent_after_2.png')
+)
 # --- Evaluation ---
 
 # Predict perturbation responses
@@ -305,7 +269,7 @@ df = pd.DataFrame(results)
 print(df)
 
 # Optional: Save results to CSV
-#df.to_csv(os.path.join(save_path, 'evaluation_results.csv'), index=False)
+df.to_csv(os.path.join(save_path, 'evaluation_results.csv'), index=False)
 
 if __name__ == "__main__":
     pass  # Ensures script runs only if executed directly

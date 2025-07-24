@@ -507,6 +507,7 @@ class CPA(BaseModelClass):
                 test_indices=self.test_indices,
                 batch_size=batch_size,
                 use_gpu=use_gpu,
+                num_workers=4
             )
         else:
             data_splitter = DataSplitter(

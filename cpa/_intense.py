@@ -1,10 +1,7 @@
 from typing import Union, Tuple, List
-import logging
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch.nn.parameter import Parameter
-import math
 
 from ._normalization_module import VectorWiseBatchNorm, Normalize3
 
@@ -66,6 +63,7 @@ class MKLFusion(nn.Module):
             a = norms ** (2 / (self.p + 1))
             b = torch.sum(norms ** (2 * self.p / (self.p + 1))) ** (1 / self.p)
             scores = a / b
+            scores = scores / torch.sum(scores)
             scores = scores.numpy()
             return dict(zip(self.in_features.keys(), scores))
 
@@ -226,4 +224,3 @@ class InTense(nn.Module):
 
     def get_relevance_score(self):
         return self.mkl_fusion.scores()
-
