@@ -1,4 +1,4 @@
-#  CPA - Compositional Perturbation Autoencoder 
+#  IntenseCPA - Interpretable Tensor Fusion Compositional Perturbation Autoencoder 
 [![PyPI version](https://badge.fury.io/py/cpa-tools.svg)](https://badge.fury.io/py/cpa-tools) [![Documentation Status](https://readthedocs.org/projects/cpa-tools/badge/?version=latest)](https://cpa-tools.readthedocs.io/en/latest/?badge=latest) [![Downloads](https://static.pepy.tech/badge/cpa-tools)](https://pepy.tech/project/cpa-tools)
 
 ## What is CPA?
@@ -13,14 +13,11 @@
 * Transfer pertubration effects from on cell-type to an unseen cell-type.
 * Enable batch effect removal on a latent space and also gene expression space.
 
-
+`IntenseCPA` is a CPA based model which combine the modality embeddings non-linearly using interpretable tensor fusion (InTense). Thus IntenseCPA is thus able to model explicitly the interaction between the model embeddings and produce a relevance scores for both (modality and interactions).
 ## Installation
 
-
-
 ### Installing CPA
-You can install CPA using pip and also directly from the github to access latest development version. 
-See detailed instructions [here](https://cpa-tools.readthedocs.io/en/latest/installation.html). 
+You can install the CPA models using pip install -e .
 
 ## How to use CPA
 Several tutorials are available [here](https://cpa-tools.readthedocs.io/en/latest/tutorials/index.html) to get you started with CPA.
@@ -34,7 +31,71 @@ The following table contains the list of tutorials:
 |Context transfer (i.e. predict the effect of a perturbation (e.g. disease) on unseen cell types or transfer perturbation effects from one context to another) demo on IFN-β scRNA perturbation dataset | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/theislab/cpa/blob/master/docs/tutorials/Kang.ipynb) - [![Open In Documentation](https://img.shields.io/badge/docs-blue)](https://cpa-tools.readthedocs.io/en/latest/tutorials/Kang.html) |
 |Batch effect removal in gene expression and latent space| [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/theislab/cpa/blob/master/docs/tutorials/Batch_correction_in_expression_space.ipynb) - [![Open In Documentation](https://img.shields.io/badge/docs-blue)](https://cpa-tools.readthedocs.io/en/latest/tutorials/Batch_correction_in_expression_space.html) |
 
-How to optmize CPA hyperparamters for your data
+
+### How to use IntenseCPA
+To train IntenseCPA, follow the same steps as shown in the tutorials above, with the addition that you need to include specific model hyperparameters unique to IntenseCPA. These include:
+
+- interaction_order: Represents the order of interactions to consider. The default is 2, but it can be set to 3 or 1 (no interaction).
+- intense_p: The p-norm value to use.
+- intense_reg_rate: The regularization rate applied by the IntenseCPA module.
+- tf_latent_dim: The dimension to which modality embeddings are projected before tensor products are computed.
+
+Below is an example of how the model parameters for IntenseCPA are structured:
+
+```python
+model_hparams = {
+"n_latent": 128,
+"recon_loss": "nb",
+"doser_type": "logsigm",
+"n_hidden_encoder": 512,
+"n_layers_encoder": 3,
+"n_hidden_decoder": 512,
+"n_layers_decoder": 3,
+"use_batch_norm_encoder": True,
+"use_layer_norm_encoder": False,
+"use_batch_norm_decoder": True,
+"use_layer_norm_decoder": False,
+"dropout_rate_encoder": 0.1,
+"dropout_rate_decoder": 0.1,
+"variational": False,
+"seed": 434,
+"use_intense": True,
+"interaction_order": 2,
+"intense_reg_rate": 0.05073135389055399,
+"intense_p": 2,
+"tf_latent_dim": 8
+}
+
+trainer_params = {
+"n_epochs_kl_warmup": None,
+"n_epochs_pretrain_ae": 3,
+"n_epochs_adv_warmup": 3,
+"n_epochs_mixup_warmup": 10,
+"mixup_alpha": 0.1,
+"adv_steps": 2,
+"n_hidden_adv": 256,
+"n_layers_adv": 2,
+"use_batch_norm_adv": False,
+"use_layer_norm_adv": True,
+"dropout_rate_adv": 0,
+"reg_adv": 1.419091687459432,
+"pen_adv": 12.775412073171998,
+"lr": 0.003273373979034034,
+"wd": 4e-07,
+"adv_lr": 0.00015304936848310163,
+"adv_wd": 0.00000011309928874122,
+"adv_loss": "cce",
+"doser_lr": 0.0007629540879596654,
+"doser_wd": 0.00000043589345787571,
+"do_clip_grad": False,
+"gradient_clip_value": 1.0,
+"step_size_lr": 25,
+"momentum": 0.5126039493891473
+}
+```
+After the training the relevance score dictionnary can be accessed using the `get_relevance_score` method of the Intense module.
+
+How to optimize the intenseCPA hyperparamters for your data
 -----------------------------------------------
 We provide an example script to use the built-in hyperparameter optimization function in CPA (based on scvi-tools hyperparam optimizer). You can find the script at `examples/tune_script.py`.
 
